@@ -21,7 +21,7 @@ type ChatMessage = {
 
 const ENDPOINT =
   import.meta.env.VITE_NOVA_ENDPOINT ||
-  "https://api-nova-5yuwh.ondigitalocean.app/api/superchat/webhook-flowise";
+  "/api/nova";
 const API_KEY = import.meta.env.VITE_NOVA_API_KEY || "";
 const DEFAULT_PHONE = "+529681198133";
 

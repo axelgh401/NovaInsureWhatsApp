@@ -13,12 +13,20 @@ Simulador de conversaciones de WhatsApp para probar el chatbot de Nova Insure.
 pnpm install
 ```
 
-Configura las variables de entorno en `.env.local`:
+Vite utiliza un proxy local para evitar CORS durante el desarrollo. Crea tu archivo local a partir del ejemplo:
+
+```bash
+cp .env.example .env.local
+```
+
+Después abre `.env.local` y configura tu API key:
 
 ```env
 VITE_NOVA_ENDPOINT=/api/nova
 VITE_NOVA_API_KEY=tu_api_key
 ```
+
+No cambies `VITE_NOVA_ENDPOINT` cuando ejecutes la app con `pnpm dev`; debe permanecer como `/api/nova`.
 
 ## Desarrollo
 
