@@ -82,7 +82,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [isExporting, setIsExporting] = useState<"png" | "jpeg" | null>(null);
+  const [isExporting, setIsExporting] = useState<"png" | "jpeg" | "txt" | null>(null);
   const [error, setError] = useState("");
   const conversationRef = useRef<HTMLDivElement>(null);
   const chatExportRef = useRef<HTMLDivElement>(null);
@@ -210,6 +210,46 @@ function App() {
     }
   }
 
+  function exportConversationAsText() {
+    if (messages.length === 0 || isExporting) return;
+
+    setIsExporting("txt");
+    setError("");
+
+    try {
+      const transcript = [
+        "NOVA INSURE · CONVERSACIÓN DE WHATSAPP",
+        `Número: ${phone.trim()}`,
+        `Fecha de exportación: ${new Intl.DateTimeFormat("es-MX", {
+          dateStyle: "long",
+          timeStyle: "short",
+        }).format(new Date())}`,
+        "",
+        ...messages.flatMap((item) => [
+          `[${item.time}] ${item.sender === "user" ? "REMITENTE · TÚ" : "RECEPTOR · NOVA INSURE"}`,
+          item.text,
+          "",
+        ]),
+      ].join("\n");
+      const blob = new Blob(["\ufeff", transcript], {
+        type: "text/plain;charset=utf-8",
+      });
+      const link = document.createElement("a");
+      link.download = `nova-insure-conversacion-${new Date().toISOString().slice(0, 10)}.txt`;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (exportError) {
+      const detail =
+        exportError instanceof Error
+          ? exportError.message
+          : "No fue posible generar el archivo de texto.";
+      setError(`No se pudo exportar la conversación: ${detail}`);
+    } finally {
+      setIsExporting(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="simulator">
@@ -266,6 +306,13 @@ function App() {
                   disabled={messages.length === 0 || isExporting !== null}
                 >
                   {isExporting === "jpeg" ? "Generando..." : "JPEG"}
+                </button>
+                <button
+                  type="button"
+                  onClick={exportConversationAsText}
+                  disabled={messages.length === 0 || isExporting !== null}
+                >
+                  {isExporting === "txt" ? "Generando..." : "TXT"}
                 </button>
               </div>
               <p className="hint export-hint">

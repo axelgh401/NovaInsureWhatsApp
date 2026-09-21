@@ -29,7 +29,7 @@ input:focus { border-color: #76bbaa; box-shadow: 0 0 0 3px #76bbaa22; }
 .clear-button { width: 100%; margin-top: 24px; padding: 11px; border: 0; border-radius: 10px; background: transparent; color: #72908a; font-size: 12px; } .clear-button:hover { background: #edf7f2; color: #0d806d; }
 .clear-button span { margin-right: 5px; font-size: 16px; }
 .export-section { margin-top: 27px; padding-top: 22px; border-top: 1px solid #e0eee8; }
-.export-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .export-actions button { padding: 10px 8px; border: 1px solid #b9dcd0; border-radius: 9px; background: #fff; color: #0d806d; font-size: 11px; font-weight: 700; transition: background .2s, color .2s, opacity .2s; }
 .export-actions button:hover:not(:disabled) { background: #0d806d; color: #fff; }
 .export-actions button:disabled { cursor: not-allowed; opacity: .45; }
