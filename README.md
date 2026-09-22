@@ -23,10 +23,12 @@ Después abre `.env.local` y configura tu API key:
 
 ```env
 VITE_NOVA_ENDPOINT=/api/nova
-VITE_NOVA_API_KEY=tu_api_key
+NOVA_API_KEY=tu_api_key
 ```
 
 No cambies `VITE_NOVA_ENDPOINT` cuando ejecutes la app con `pnpm dev`; debe permanecer como `/api/nova`.
+
+La variable `NOVA_API_KEY` se utiliza únicamente en el proxy local y en la función serverless de Vercel. No se expone al navegador ni debe publicarse en Git.
 
 ## Desarrollo
 
@@ -41,3 +43,12 @@ La aplicación permite simular conversaciones con un número de teléfono, visua
 ```bash
 pnpm build
 ```
+
+## Despliegue en Vercel
+
+Importa este repositorio en Vercel y agrega la variable de entorno `NOVA_API_KEY` en
+**Settings → Environment Variables** para los entornos que utilizarás
+(Production, Preview y/o Development). Después despliega nuevamente.
+
+La función [`api/nova.ts`](./api/nova.ts) agrega la API key en el servidor y reenvía
+la solicitud al bot. Esto evita CORS y mantiene la credencial privada.

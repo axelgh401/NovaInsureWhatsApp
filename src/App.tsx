@@ -22,7 +22,6 @@ type ChatMessage = {
 const ENDPOINT =
   import.meta.env.VITE_NOVA_ENDPOINT ||
   "/api/nova";
-const API_KEY = import.meta.env.VITE_NOVA_API_KEY || "";
 const DEFAULT_PHONE = "+529681198133";
 
 function currentTime() {
@@ -120,7 +119,6 @@ function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-API-Key": API_KEY,
         },
         body: JSON.stringify({ phone: trimmedPhone, message: trimmedMessage }),
       });
