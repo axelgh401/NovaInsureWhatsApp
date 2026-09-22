@@ -22,11 +22,8 @@ cp .env.example .env.local
 Después abre `.env.local` y configura tu API key:
 
 ```env
-VITE_NOVA_ENDPOINT=/api/nova
 NOVA_API_KEY=tu_api_key
 ```
-
-No cambies `VITE_NOVA_ENDPOINT` cuando ejecutes la app con `pnpm dev`; debe permanecer como `/api/nova`.
 
 La variable `NOVA_API_KEY` se utiliza únicamente en el proxy local y en la función serverless de Vercel. No se expone al navegador ni debe publicarse en Git.
 

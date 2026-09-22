@@ -19,9 +19,7 @@ type ChatMessage = {
   status?: "sending" | "sent" | "error";
 };
 
-const ENDPOINT =
-  import.meta.env.VITE_NOVA_ENDPOINT ||
-  "/api/nova";
+const ENDPOINT = "/api/nova";
 const DEFAULT_PHONE = "+529681198133";
 
 function currentTime() {
