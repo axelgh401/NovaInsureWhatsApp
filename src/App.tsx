@@ -19,8 +19,21 @@ type ChatMessage = {
   status?: "sending" | "sent" | "error";
 };
 
+type Profile = {
+  id: string;
+  emoji: string;
+  name: string;
+  phone: string;
+};
+
+const PROFILES: Profile[] = [
+  { id: "adrian", emoji: "👤", name: "Adrian Gonzalo Silva Ortiz", phone: "+5493813544275" },
+  { id: "axel", emoji: "🧑‍💻", name: "Axel F Green", phone: "+529681198133" },
+  { id: "oscar", emoji: "🧔", name: "Oscar Tellez", phone: "+19123109148" },
+  { id: "custom", emoji: "✏️", name: "Custom", phone: "" },
+];
+
 const ENDPOINT = "/api/nova";
-const DEFAULT_PHONE = "+529681198133";
 
 function currentTime() {
   return new Intl.DateTimeFormat("es-MX", {
@@ -75,7 +88,8 @@ function formatWhatsAppMessage(text: string): ReactNode {
 }
 
 function App() {
-  const [phone, setPhone] = useState(DEFAULT_PHONE);
+  const [selectedProfile, setSelectedProfile] = useState("oscar");
+  const [customPhone, setCustomPhone] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -83,6 +97,8 @@ function App() {
   const [error, setError] = useState("");
   const conversationRef = useRef<HTMLDivElement>(null);
   const chatExportRef = useRef<HTMLDivElement>(null);
+  const selectedProfileData = PROFILES.find((profile) => profile.id === selectedProfile);
+  const phone = selectedProfileData?.phone || customPhone;
 
   useEffect(() => {
     conversationRef.current?.scrollTo({
@@ -161,6 +177,11 @@ function App() {
 
   function clearConversation() {
     setMessages([]);
+    setError("");
+  }
+
+  function handleProfileChange(profileId: string) {
+    setSelectedProfile(profileId);
     setError("");
   }
 
@@ -270,15 +291,35 @@ function App() {
             <p className="panel-copy">
               Simula una conversación real con el chatbot usando el número que necesites.
             </p>
-            <label htmlFor="phone">Número de WhatsApp</label>
-            <input
-              id="phone"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="+52 000 000 0000"
-              inputMode="tel"
-            />
-            <p className="hint">Incluye código de país, por ejemplo +52.</p>
+            <label htmlFor="profile">Perfil de prueba</label>
+            <select
+              id="profile"
+              value={selectedProfile}
+              onChange={(event) => handleProfileChange(event.target.value)}
+            >
+              {PROFILES.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.emoji} {profile.name} · {profile.phone || "Ingresa un teléfono"}
+                </option>
+              ))}
+            </select>
+            {selectedProfile === "custom" ? (
+              <>
+                <label className="custom-phone-label" htmlFor="custom-phone">
+                  Número de WhatsApp
+                </label>
+                <input
+                  id="custom-phone"
+                  value={customPhone}
+                  onChange={(event) => setCustomPhone(event.target.value)}
+                  placeholder="+52 000 000 0000"
+                  inputMode="tel"
+                />
+                <p className="hint">Incluye código de país, por ejemplo +52.</p>
+              </>
+            ) : (
+              <p className="selected-phone">Teléfono: {phone}</p>
+            )}
             <div className="endpoint-note">
               <span className="status-dot" />
               <div><strong>Nova Bot</strong><small>Sesión en tiempo real</small></div>

@@ -21,8 +21,11 @@ h1 { font-size: 20px; } h2 { font-size: 23px; }
 .sparkle { color: #0d806d; font-size: 21px; }
 .panel-copy { margin: 16px 0 28px; color: #6e8882; font-size: 13px; line-height: 1.55; }
 label { display: block; margin-bottom: 9px; color: #315950; font-size: 12px; font-weight: 700; }
-input { width: 100%; border: 1px solid #d3e5de; outline: none; border-radius: 10px; background: #f9fcfa; color: #21453f; padding: 13px 14px; font-size: 14px; transition: border .2s, box-shadow .2s; }
-input:focus { border-color: #76bbaa; box-shadow: 0 0 0 3px #76bbaa22; }
+input, select { width: 100%; border: 1px solid #d3e5de; outline: none; border-radius: 10px; background: #f9fcfa; color: #21453f; padding: 13px 14px; font-size: 14px; transition: border .2s, box-shadow .2s; }
+select { appearance: auto; }
+input:focus, select:focus { border-color: #76bbaa; box-shadow: 0 0 0 3px #76bbaa22; }
+.custom-phone-label { margin-top: 19px; }
+.selected-phone { margin: 9px 0 26px; color: #6e8882; font-size: 12px; }
 .hint { margin: 8px 0 26px; color: #9aada8; font-size: 11px; }
 .endpoint-note { display: flex; align-items: center; gap: 12px; padding: 15px; border: 1px solid #e0eee8; border-radius: 13px; background: #f6fbf8; }
 .endpoint-note div { display: grid; gap: 3px; } .endpoint-note strong { font-size: 13px; } .endpoint-note small { color: #83a098; font-size: 11px; }
