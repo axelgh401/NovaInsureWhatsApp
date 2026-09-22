@@ -47,5 +47,14 @@ Importa este repositorio en Vercel y agrega la variable de entorno `NOVA_API_KEY
 **Settings → Environment Variables** para los entornos que utilizarás
 (Production, Preview y/o Development). Después despliega nuevamente.
 
+Usa exactamente este nombre:
+
+```text
+NOVA_API_KEY
+```
+
+No uses `VITE_NOVA_API_KEY`, `VITE_NOVA_ENDPOINT` ni ningún prefijo público.
+La API key no se incluye en el repositorio.
+
 La función [`api/nova.ts`](./api/nova.ts) agrega la API key en el servidor y reenvía
 la solicitud al bot. Esto evita CORS y mantiene la credencial privada.
