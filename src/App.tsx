@@ -1,4 +1,4 @@
-import { FormEvent, Fragment, ReactNode, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, Fragment, ReactNode, useEffect, useRef, useState } from "react";
 import { toJpeg, toPng } from "html-to-image";
 
 type ApiResponse = {
@@ -16,7 +16,13 @@ type ChatMessage = {
   text: string;
   sender: "user" | "bot";
   time: string;
-  status?: "sending" | "sent" | "error";
+  status?: "sending" | "sent" | "error" | "local";
+  media?: {
+    kind: "audio" | "image";
+    name: string;
+    url: string;
+    mimeType: string;
+  };
 };
 
 type Profile = {
@@ -97,6 +103,9 @@ function App() {
   const [error, setError] = useState("");
   const conversationRef = useRef<HTMLDivElement>(null);
   const chatExportRef = useRef<HTMLDivElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const attachmentUrlsRef = useRef<string[]>([]);
   const selectedProfileData = PROFILES.find((profile) => profile.id === selectedProfile);
   const phone = selectedProfileData?.phone || customPhone;
 
@@ -106,6 +115,13 @@ function App() {
       behavior: "smooth",
     });
   }, [messages, isSending]);
+
+  useEffect(
+    () => () => {
+      attachmentUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    },
+    [],
+  );
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
@@ -176,8 +192,38 @@ function App() {
   }
 
   function clearConversation() {
+    attachmentUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    attachmentUrlsRef.current = [];
     setMessages([]);
     setError("");
+  }
+
+  function addMediaFiles(event: ChangeEvent<HTMLInputElement>, kind: "audio" | "image") {
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = "";
+    if (files.length === 0) return;
+
+    const validFiles = files.filter((file) => file.type.startsWith(`${kind}/`));
+    if (validFiles.length !== files.length) {
+      setError(`Solo se pueden agregar archivos de ${kind === "audio" ? "audio" : "imagen"}.`);
+    } else {
+      setError("");
+    }
+    if (validFiles.length === 0) return;
+
+    const newMessages = validFiles.map((file): ChatMessage => {
+      const url = URL.createObjectURL(file);
+      attachmentUrlsRef.current.push(url);
+      return {
+        id: crypto.randomUUID(),
+        text: "",
+        sender: "user",
+        time: currentTime(),
+        status: "local",
+        media: { kind, name: file.name, url, mimeType: file.type },
+      };
+    });
+    setMessages((current) => [...current, ...newMessages]);
   }
 
   function handleProfileChange(profileId: string) {
@@ -244,7 +290,9 @@ function App() {
         "",
         ...messages.flatMap((item) => [
           `[${item.time}] ${item.sender === "user" ? "REMITENTE · TÚ" : "RECEPTOR · NOVA INSURE"}`,
-          item.text,
+          item.media
+            ? `[Adjunto local no enviado al bot: ${item.media.kind === "audio" ? "audio" : "imagen"} · ${item.media.name}]`
+            : item.text,
           "",
         ]),
       ].join("\n");
@@ -294,6 +342,8 @@ function App() {
             <label htmlFor="profile">Perfil de prueba</label>
             <select
               id="profile"
+              data-testid="profile-select"
+              aria-label="Seleccionar perfil de prueba"
               value={selectedProfile}
               onChange={(event) => handleProfileChange(event.target.value)}
             >
@@ -310,6 +360,8 @@ function App() {
                 </label>
                 <input
                   id="custom-phone"
+                  data-testid="custom-phone-input"
+                  aria-label="Número de teléfono personalizado"
                   value={customPhone}
                   onChange={(event) => setCustomPhone(event.target.value)}
                   placeholder="+52 000 000 0000"
@@ -324,14 +376,24 @@ function App() {
               <span className="status-dot" />
               <div><strong>Nova Bot</strong><small>Sesión en tiempo real</small></div>
             </div>
-            <button className="clear-button" type="button" onClick={clearConversation}>
+            <button
+              className="clear-button"
+              id="clear-conversation-button"
+              data-testid="clear-conversation"
+              aria-label="Limpiar toda la conversación"
+              type="button"
+              onClick={clearConversation}
+            >
               <span>↻</span> Limpiar conversación
             </button>
             <div className="export-section">
-              <label>Exportar conversación</label>
+              <label>Guardar conversación</label>
               <div className="export-actions">
                 <button
                   type="button"
+                  id="save-conversation-png"
+                  data-testid="save-conversation-png"
+                  aria-label="Guardar conversación como PNG"
                   onClick={() => exportConversation("png")}
                   disabled={messages.length === 0 || isExporting !== null}
                 >
@@ -339,6 +401,9 @@ function App() {
                 </button>
                 <button
                   type="button"
+                  id="save-conversation-jpeg"
+                  data-testid="save-conversation-jpeg"
+                  aria-label="Guardar conversación como JPEG"
                   onClick={() => exportConversation("jpeg")}
                   disabled={messages.length === 0 || isExporting !== null}
                 >
@@ -346,6 +411,9 @@ function App() {
                 </button>
                 <button
                   type="button"
+                  id="save-conversation-txt"
+                  data-testid="save-conversation-txt"
+                  aria-label="Guardar conversación como TXT"
                   onClick={exportConversationAsText}
                   disabled={messages.length === 0 || isExporting !== null}
                 >
@@ -358,8 +426,12 @@ function App() {
             </div>
           </aside>
 
-          <section className="phone-frame" aria-label="Conversación de WhatsApp">
-            <div className="chat-export" ref={chatExportRef}>
+          <section
+            className="phone-frame"
+            aria-label="Conversación de WhatsApp"
+            data-testid="conversation-panel"
+          >
+            <div className="chat-export" ref={chatExportRef} data-testid="conversation-export">
               <div className="chat-header">
                 <div className="avatar">N</div>
                 <div className="contact">
@@ -368,7 +440,13 @@ function App() {
                 </div>
                 <div className="chat-actions"><span>⌕</span><span>⋮</span></div>
               </div>
-              <div className="conversation" ref={conversationRef}>
+              <div
+                className="conversation"
+                id="conversation-messages"
+                data-testid="conversation-messages"
+                aria-live="polite"
+                ref={conversationRef}
+              >
                 <div className="date-divider"><span>HOY</span></div>
                 {messages.length === 0 && (
                   <div className="empty-state">
@@ -378,14 +456,48 @@ function App() {
                   </div>
                 )}
                 {messages.map((item) => (
-                  <div className={`message-row ${item.sender}`} key={item.id}>
+                  <div
+                    className={`message-row ${item.sender}`}
+                    key={item.id}
+                    data-testid="conversation-message"
+                    data-message-id={item.id}
+                    data-message-sender={item.sender}
+                    data-message-status={item.status ?? "received"}
+                    data-message-type={item.media?.kind ?? "text"}
+                  >
                     <div className="bubble">
-                      <div className="bubble-text">{formatWhatsAppMessage(item.text)}</div>
+                      {item.media?.kind === "image" && (
+                        <img
+                          className="message-image"
+                          src={item.media.url}
+                          alt={`Imagen adjunta: ${item.media.name}`}
+                        />
+                      )}
+                      {item.media?.kind === "audio" && (
+                        <div className="message-audio">
+                          <audio controls preload="metadata" src={item.media.url}>
+                            Tu navegador no admite la reproducción de audio.
+                          </audio>
+                          <span>{item.media.name}</span>
+                        </div>
+                      )}
+                      {item.text && (
+                        <div className="bubble-text">{formatWhatsAppMessage(item.text)}</div>
+                      )}
                       <div className="bubble-meta">
                         <span>{item.time}</span>
+                        {item.status === "local" && (
+                          <span className="local-only-status">Vista local · no enviado al bot</span>
+                        )}
                         {item.sender === "user" && (
                           <span className={`checks ${item.status}`}>
-                            {item.status === "error" ? "!" : item.status === "sending" ? "◷" : "✓✓"}
+                            {item.status === "error"
+                              ? "!"
+                              : item.status === "sending"
+                                ? "◷"
+                                : item.status === "local"
+                                  ? "◌"
+                                  : "✓✓"}
                           </span>
                         )}
                       </div>
@@ -395,23 +507,86 @@ function App() {
                 {isSending && <div className="typing"><i /><i /><i /></div>}
               </div>
             </div>
-            {error && <div className="error-banner" role="alert">⚠ {error}</div>}
-            <form className="composer" onSubmit={sendMessage}>
+            {error && <div className="error-banner" role="alert" data-testid="request-error">⚠ {error}</div>}
+            <form
+              className="composer"
+              id="message-composer"
+              data-testid="message-composer"
+              onSubmit={sendMessage}
+            >
               <button type="button" className="round-action" aria-label="Emoji">☺</button>
+              <div className="media-actions">
+                <input
+                  ref={audioInputRef}
+                  className="file-input-hidden"
+                  id="audio-file-input"
+                  data-testid="audio-file-input"
+                  aria-label="Seleccionar archivo de audio"
+                  type="file"
+                  accept="audio/*"
+                  multiple
+                  onChange={(event) => addMediaFiles(event, "audio")}
+                />
+                <input
+                  ref={imageInputRef}
+                  className="file-input-hidden"
+                  id="image-file-input"
+                  data-testid="image-file-input"
+                  aria-label="Seleccionar archivo de imagen"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(event) => addMediaFiles(event, "image")}
+                />
+                <button
+                  className="media-button"
+                  id="attach-audio-button"
+                  data-testid="attach-audio"
+                  type="button"
+                  aria-label="Adjuntar audio"
+                  title="Adjuntar audio"
+                  onClick={() => audioInputRef.current?.click()}
+                >
+                  <span aria-hidden="true">♫</span>
+                </button>
+                <button
+                  className="media-button"
+                  id="attach-image-button"
+                  data-testid="attach-image"
+                  type="button"
+                  aria-label="Adjuntar imagen"
+                  title="Adjuntar imagen"
+                  onClick={() => imageInputRef.current?.click()}
+                >
+                  <span aria-hidden="true">▧</span>
+                </button>
+              </div>
               <input
+                id="message-input"
+                data-testid="message-input"
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 placeholder="Escribe un mensaje"
-                aria-label="Mensaje"
+                aria-label="Escribir mensaje de texto"
                 disabled={isSending}
               />
-              <button className="send-button" type="submit" aria-label="Enviar mensaje" disabled={isSending || !message.trim() || !phone.trim()}>
+              <button
+                className="send-button"
+                id="send-message-button"
+                data-testid="send-message"
+                type="submit"
+                aria-label="Enviar mensaje de texto"
+                title="Enviar mensaje"
+                disabled={isSending || !message.trim() || !phone.trim()}
+              >
                 ➤
               </button>
             </form>
           </section>
         </div>
-        <footer>Las conversaciones no se guardan. Cada prueba inicia una sesión temporal.</footer>
+        <footer>
+          Las conversaciones no se guardan. Audio e imagen se muestran localmente y no se envían al bot.
+        </footer>
       </section>
     </main>
   );
