@@ -205,7 +205,7 @@ footer { margin-top: 14px; color: #98aaa5; text-align: center; font-size: 11px; 
 .export-tracking-label { margin-top: 19px; padding-top: 16px; border-top: 1px solid #e0eee8; }
 .tracking-export-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .tracking-export-actions button { min-height: 38px; font-size: 10px; }
-.tracking-export-stage { position: fixed; top: 0; left: -100000px; z-index: -1; display: grid; width: 1600px; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); align-items: start; gap: 24px; padding: 24px; background: #edf4f1; color: #173b38; }
+.tracking-export-stage { position: fixed; top: 0; left: 0; z-index: -1; display: grid; width: 1600px; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); align-items: start; gap: 24px; padding: 24px; background: #edf4f1; color: #173b38; }
 .tracking-export-chat { width: 100%; border: 5px solid #d0e0da; border-radius: 16px; background: #efeae2; box-shadow: 0 12px 30px #36574d20; }
 .tracking-export-chat .conversation { width: 100%; }
 .tracking-export-metrics { width: 100%; }
