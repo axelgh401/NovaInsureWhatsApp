@@ -33,7 +33,7 @@ La variable `NOVA_API_KEY` se utiliza únicamente en el proxy local y en la func
 pnpm dev
 ```
 
-La aplicación permite simular conversaciones con un número de teléfono, visualizar las respuestas con formato estilo WhatsApp y guardar el historial como PNG, JPEG o TXT.
+La aplicación permite simular conversaciones con un número de teléfono, visualizar las respuestas con formato estilo WhatsApp y guardar el historial como PNG, JPEG o TXT. También puede exportar la conversación junto con el panel completo de tracking en PNG, o generar un TXT con la transcripción, métricas por turno y snapshot JSON. El panel de métricas registra por cada respuesta el estado HTTP, latencia real, estado reportado por la API, agente, intención, fase, atención humana y `sessionId`; también resume errores, escalaciones, agentes observados y latencia promedio. Si el endpoint omite un campo, la interfaz lo muestra como no reportado en lugar de inferirlo.
 
 ### Automatización RPA
 
@@ -46,6 +46,26 @@ Los controles principales exponen identificadores estables (`data-testid`):
 - `conversation-messages`, `conversation-message`
 - `clear-conversation`
 - `save-conversation-png`, `save-conversation-jpeg`, `save-conversation-txt`
+- `save-conversation-tracking-png`, `save-conversation-tracking-txt`
+- `conversation-metrics`, `conversation-tracking-json`
+- `metric-turn-count`, `metric-api-result`, `metric-human-attention`, `metric-average-latency`
+- `tracked-turn`, `turn-http-status`, `turn-agent`, `turn-phase`, `turn-intent`
+- `turn-human-attention`, `turn-latency`, `turn-question`, `turn-response`, `turn-session-id`
+
+`conversation-tracking-json` es el contrato RPA recomendado: contiene un snapshot JSON con `schemaVersion`, el perfil, los contadores agregados y todos los turnos. Cada turno tiene `status` (`pending`, `success`, `failed` o `unverified`), ID de correlación, pregunta, respuesta, timestamps, latencia en milisegundos, HTTP, estado API, agente, intención, fase, atención humana, sesión y error. Los datos omitidos por la API son `null`; no se deben inferir.
+
+Las exportaciones combinadas se identifican como `save-conversation-tracking-png` (chat completo y panel de métricas en una imagen lateral) y `save-conversation-tracking-txt` (transcripción, resumen, desglose por turno y snapshot JSON).
+
+Ejemplo con Playwright:
+
+```js
+const snapshotText = await page.getByTestId("conversation-tracking-json").textContent();
+const tracking = JSON.parse(snapshotText ?? "{}");
+const failedTurns = tracking.turns.filter((turn) => turn.status === "failed");
+console.log(tracking.summary, failedTurns);
+```
+
+Como alternativa, cada tarjeta `tracked-turn` expone esos valores en atributos `data-*` y selectores por campo para lectura incremental. Espera a que el turno deje de estar `pending` antes de evaluarlo. Al limpiar la conversación, se limpian tanto las métricas visibles como el snapshot.
 
 Audio e imagen se pueden seleccionar y previsualizar en la conversación, pero actualmente son adjuntos locales de simulación y no se envían a la API del bot. Solo se aceptan tipos MIME `audio/*` e `image/*`.
 

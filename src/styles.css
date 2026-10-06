@@ -66,3 +66,150 @@ input:focus, select:focus { border-color: #76bbaa; box-shadow: 0 0 0 3px #76bbaa
 .local-only-status { color: #9a6a31; font-size: 9px; }
 footer { margin-top: 14px; color: #98aaa5; text-align: center; font-size: 11px; }
 @media (max-width: 760px) { .app-shell { padding: 22px 13px; } .connection-pill { display: none; } .workspace { grid-template-columns: 1fr; gap: 16px; } .control-panel { padding: 21px; } .phone-frame { min-height: 600px; } }
+
+.app-shell { padding: 30px clamp(16px, 3vw, 44px); }
+.simulator { max-width: 1500px; }
+.topbar { margin-bottom: 20px; }
+.control-panel { display: grid; grid-template-columns: minmax(210px, .85fr) minmax(280px, 1.2fr) minmax(260px, 1fr); gap: 20px; align-items: center; margin-bottom: 18px; padding: 17px 21px; border-radius: 16px; }
+.config-intro .panel-copy { margin: 8px 0 0; }
+.config-intro h2 { font-size: 18px; }
+.profile-config { display: grid; grid-template-columns: minmax(115px, .6fr) minmax(200px, 1.4fr); gap: 7px 12px; align-items: center; }
+.profile-config label { margin: 0; }
+.profile-config select, .profile-config input { min-width: 0; padding: 10px 12px; font-size: 12px; }
+.profile-config .selected-phone { grid-column: 2; margin: 0; font-size: 11px; }
+.profile-config .custom-phone-label { margin: 0; }
+.profile-config .hint { grid-column: 2; margin: 0; }
+.config-actions { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
+.endpoint-note { padding: 9px 11px; }
+.endpoint-note strong { font-size: 12px; }
+.endpoint-note small { font-size: 10px; }
+.clear-button { width: auto; margin: 0; padding: 10px; white-space: nowrap; }
+.clear-button:disabled { cursor: not-allowed; opacity: .5; }
+.export-section { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin: 2px 0 0; padding: 10px 0 0; }
+.export-section > label { flex: 0 0 auto; margin: 0; }
+.export-actions { grid-template-columns: repeat(3, 64px); flex: 0 0 auto; }
+.export-actions button { padding: 8px 6px; }
+.export-hint { margin: 0; }
+.workspace { grid-template-columns: minmax(0, 1.12fr) minmax(360px, .88fr); gap: 18px; align-items: stretch; }
+.phone-frame, .metrics-panel { height: min(74vh, 900px); min-height: 590px; border-radius: 16px; }
+.phone-frame { border-width: 5px; }
+.chat-header { background: #f0f2f5; color: #253e39; }
+.contact span { color: #71837d; }
+.avatar { background: #123f6a; }
+.conversation { background-image: linear-gradient(135deg, #ece7df 25%, transparent 25%), linear-gradient(225deg, #ece7df 25%, transparent 25%), linear-gradient(45deg, #ece7df 25%, transparent 25%), linear-gradient(315deg, #ece7df 25%, #f3eee6 25%); background-position: 12px 0, 12px 0, 0 0, 0 0; background-size: 24px 24px; background-repeat: repeat; }
+.metrics-panel { display: flex; min-width: 0; flex-direction: column; overflow: hidden; padding: 19px; border: 1px solid #d9e2e8; border-radius: 16px; background: #fff; box-shadow: 0 14px 40px #36574d0d; }
+.metrics-header { padding-bottom: 12px; border-bottom: 1px solid #e8edf0; }
+.metrics-header .eyebrow { margin-bottom: 4px; }
+.metrics-header h2 { font-size: 18px; }
+.metrics-subtitle { margin: 5px 0 0; color: #74818c; font-size: 11px; }
+.metrics-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; padding: 12px 0 15px; }
+.metric-tile { display: grid; min-width: 0; gap: 4px; padding: 9px 10px; border: 1px solid #e2e8ed; border-radius: 8px; background: #f8fafc; }
+.metric-tile span { color: #74818c; font-size: 10px; }
+.metric-tile strong { overflow-wrap: anywhere; color: #253547; font-size: 11px; font-weight: 700; }
+.metric-tile-wide { grid-column: 1 / -1; }
+.metric-success { color: #167c57 !important; }
+.metric-warning { color: #a3610b !important; }
+.metric-error { color: #b33b37 !important; }
+.turn-list-heading { display: flex; justify-content: space-between; align-items: end; gap: 12px; padding: 4px 0 9px; }
+.turn-list-heading .eyebrow { margin-bottom: 3px; }
+.turn-list-heading h3 { margin: 0; color: #283748; font-size: 13px; }
+.turn-list-heading > span { color: #758391; font-size: 10px; }
+.turn-list { min-height: 0; flex: 1; overflow-y: auto; padding-right: 3px; }
+.turn-card { margin-bottom: 8px; padding: 10px; border: 1px solid #e1e7ec; border-radius: 9px; background: #fff; }
+.turn-card-error { border-color: #f0c3bf; background: #fffafa; }
+.turn-card-heading { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: #29384a; font-size: 11px; }
+.turn-card-heading span { color: #718091; font-size: 10px; }
+.turn-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; color: #4c5d6b; font-size: 10px; }
+.turn-metrics b { color: #344354; }
+.turn-intent { grid-column: 1 / -1; }
+.turn-error { margin: 9px 0 0; padding: 7px 8px; border-radius: 5px; background: #fff0ef; color: #a43f38; font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
+.turn-details { margin-top: 9px; padding-top: 7px; border-top: 1px solid #edf0f2; color: #526171; font-size: 10px; }
+.turn-details summary { cursor: pointer; color: #43766d; font-weight: 600; }
+.turn-details dl { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 6px 8px; margin: 9px 0 0; line-height: 1.4; }
+.turn-details dt { color: #788592; }
+.turn-details dd { min-width: 0; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.metrics-empty { display: grid; flex: 1; align-content: center; justify-items: center; gap: 8px; padding: 24px; text-align: center; color: #74818c; }
+.metrics-empty > span { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; background: #eaf4f1; color: #238774; font-size: 24px; }
+.metrics-empty strong { color: #394858; font-size: 12px; }
+.metrics-empty p { max-width: 270px; margin: 0; font-size: 11px; line-height: 1.5; }
+.metrics-footer { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid #e8edf0; color: #718091; font-size: 9px; }
+.metrics-footer strong { justify-self: end; color: #465767; font-weight: 600; }
+@media (max-width: 1050px) {
+  .control-panel { grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.2fr); }
+  .config-actions { grid-column: 1 / -1; grid-template-columns: 1fr auto; }
+  .workspace { grid-template-columns: minmax(0, 1fr) minmax(310px, .9fr); gap: 14px; }
+  .metrics-panel { padding: 15px; }
+}
+@media (max-width: 760px) {
+  .app-shell { padding: 18px 12px; }
+  .topbar { margin-bottom: 14px; }
+  .workspace { grid-template-columns: 1fr; }
+  .control-panel { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
+  .config-actions { grid-column: auto; }
+  .profile-config { grid-template-columns: 1fr; }
+  .profile-config .selected-phone, .profile-config .hint { grid-column: auto; }
+  .profile-config label:not(:first-child) { margin-top: 5px; }
+  .export-section { flex-wrap: wrap; }
+  .phone-frame, .metrics-panel { height: auto; min-height: 580px; }
+  .metrics-panel { max-height: 740px; }
+}
+@media (max-width: 420px) {
+  .brand-mark { width: 38px; height: 38px; }
+  h1 { font-size: 17px; }
+  .config-actions { grid-template-columns: 1fr; }
+  .clear-button { justify-self: start; }
+  .metrics-panel { padding: 13px; }
+  .metrics-summary { grid-template-columns: 1fr 1fr; }
+  .turn-metrics { grid-template-columns: 1fr; }
+  .turn-intent { grid-column: auto; }
+}
+
+.workspace { grid-template-columns: minmax(250px, 300px) minmax(0, 1.15fr) minmax(330px, .9fr); gap: 18px; }
+.control-panel { display: block; margin: 0; padding: 25px 22px; align-self: stretch; }
+.config-intro .panel-copy { margin: 16px 0 28px; }
+.config-intro h2 { font-size: 23px; }
+.profile-config { display: block; }
+.profile-config label { margin-bottom: 9px; }
+.profile-config select, .profile-config input { padding: 13px 14px; font-size: 14px; }
+.profile-config .selected-phone { margin: 9px 0 26px; font-size: 12px; }
+.profile-config .custom-phone-label { margin-top: 19px; }
+.profile-config .hint { margin: 8px 0 26px; }
+.config-actions { display: block; }
+.endpoint-note { padding: 15px; }
+.endpoint-note strong { font-size: 13px; }
+.endpoint-note small { font-size: 11px; }
+.clear-button { width: 100%; margin-top: 24px; padding: 11px; white-space: normal; }
+.export-section { display: block; margin-top: 27px; padding-top: 22px; }
+.export-section > label { margin-bottom: 9px; }
+.export-actions { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.export-actions button { padding: 10px 8px; }
+.export-hint { margin: 8px 0 0; }
+.phone-frame, .metrics-panel { height: min(74vh, 900px); min-height: 590px; }
+.phone-frame { min-width: 0; }
+.metrics-panel { min-width: 0; }
+@media (max-width: 1180px) and (min-width: 761px) {
+  .workspace { grid-template-columns: minmax(230px, 270px) minmax(0, 1fr); }
+  .metrics-panel { grid-column: 2; height: 520px; min-height: 420px; }
+  .phone-frame { height: 650px; }
+}
+@media (max-width: 760px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .control-panel { display: block; margin: 0; padding: 21px; }
+  .profile-config { display: block; }
+  .config-actions { display: block; }
+  .export-section { display: block; margin-top: 27px; padding-top: 22px; }
+  .export-actions { grid-template-columns: repeat(3, 1fr); }
+  .phone-frame { height: auto; min-height: 600px; }
+  .metrics-panel { grid-column: auto; height: auto; min-height: 580px; max-height: 740px; }
+}
+.export-tracking-label { margin-top: 19px; padding-top: 16px; border-top: 1px solid #e0eee8; }
+.tracking-export-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tracking-export-actions button { min-height: 38px; font-size: 10px; }
+.tracking-export-stage { position: fixed; top: 0; left: -100000px; z-index: -1; display: grid; width: 1600px; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); align-items: start; gap: 24px; padding: 24px; background: #edf4f1; color: #173b38; }
+.tracking-export-chat { width: 100%; border: 5px solid #d0e0da; border-radius: 16px; background: #efeae2; box-shadow: 0 12px 30px #36574d20; }
+.tracking-export-chat .conversation { width: 100%; }
+.tracking-export-metrics { width: 100%; }
+.tracking-export-metrics .turn-list { padding-right: 0; }
+@media (max-width: 420px) {
+  .tracking-export-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
