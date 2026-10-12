@@ -48,12 +48,21 @@ function responseObject(value: unknown): ApiResponse | null {
   const record = value as Record<string, unknown>;
   const textOrNumber = (field: unknown): string | number | undefined =>
     typeof field === "string" || typeof field === "number" ? field : undefined;
+  const textField = (field: unknown): string | undefined => {
+    if (typeof field === "string") return field;
+    if (Array.isArray(field)) {
+      return field
+        .map((item) => (typeof item === "string" ? item : String(item ?? "")))
+        .join("\n");
+    }
+    return typeof field === "number" ? String(field) : undefined;
+  };
   return {
     success:
       typeof record.success === "boolean" || typeof record.success === "string"
         ? record.success
         : undefined,
-    message: typeof record.message === "string" ? record.message : undefined,
+    message: textField(record.message),
     human_attention:
       typeof record.human_attention === "boolean" || typeof record.human_attention === "string"
         ? record.human_attention
@@ -62,7 +71,7 @@ function responseObject(value: unknown): ApiResponse | null {
     agent: textOrNumber(record.agent),
     phase: textOrNumber(record.phase),
     sessionId: textOrNumber(record.sessionId),
-    error: typeof record.error === "string" ? record.error : undefined,
+    error: textField(record.error),
   };
 }
 
@@ -102,13 +111,114 @@ type Profile = {
   emoji: string;
   name: string;
   phone: string;
+  type: "client" | "prospect";
+  universes: string[];
 };
 
 const PROFILES: Profile[] = [
-  { id: "adrian", emoji: "👤", name: "Adrian Gonzalo Silva Ortiz", phone: "+5493813544275" },
-  { id: "axel", emoji: "🧑‍💻", name: "Axel F Green", phone: "+529681198133" },
-  { id: "oscar", emoji: "🧔", name: "Oscar Tellez", phone: "+19123109148" },
-  { id: "custom", emoji: "✏️", name: "Custom", phone: "" },
+  {
+    id: "adrian",
+    emoji: "👤",
+    name: "Adrian Gonzalo Silva Ortiz",
+    phone: "+5493813544275",
+    type: "client",
+    universes: ["Clientes con póliza activa de coche", "Clientes en general"],
+  },
+  {
+    id: "axel",
+    emoji: "🧑‍💻",
+    name: "Axel F Green",
+    phone: "+529681198133",
+    type: "client",
+    universes: ["Clientes con póliza activa de coche", "Clientes en general"],
+  },
+  {
+    id: "oscar",
+    emoji: "🧔",
+    name: "Oscar Tellez",
+    phone: "+19123109148",
+    type: "client",
+    universes: [
+      "Clientes con póliza activa de coche",
+      "Clientes con una póliza activa dif coche",
+      "Clientes mas de una póliza activa",
+      "Clientes en general",
+      "Clientes con póliza inactiva",
+      "Clientes con póliza vencida",
+    ],
+  },
+  {
+    id: "danny-j-almeida-ortiz",
+    emoji: "👤",
+    name: "Danny J Almeida Ortiz",
+    phone: "+19127302823",
+    type: "client",
+    universes: ["Clientes con póliza activa de coche", "Clientes en general"],
+  },
+  {
+    id: "aaron-g-smith",
+    emoji: "👤",
+    name: "Aaron G Smith",
+    phone: "+19127300021",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos auto"],
+  },
+  {
+    id: "tomas-ortega",
+    emoji: "👤",
+    name: "Tomas Ortega",
+    phone: "+19154401029",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos auto"],
+  },
+  {
+    id: "samuel-perez-diaz",
+    emoji: "👤",
+    name: "Samuel Perez Diaz",
+    phone: "+525543717323",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos auto"],
+  },
+  {
+    id: "maria-contreras",
+    emoji: "👤",
+    name: "Maria Contreras",
+    phone: "+19125551010",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos dif auto"],
+  },
+  {
+    id: "robert-johnson",
+    emoji: "👤",
+    name: "Robert Johnson",
+    phone: "+19125552020",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos dif auto"],
+  },
+  {
+    id: "william-bradley",
+    emoji: "👤",
+    name: "William Bradley",
+    phone: "+19125553030",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos auto"],
+  },
+  {
+    id: "jorge-fernandez",
+    emoji: "👤",
+    name: "Jorge Fernandez",
+    phone: "+19125554040",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos auto", "Prospectos dif auto"],
+  },
+  {
+    id: "elena-montes",
+    emoji: "👤",
+    name: "Elena Montes",
+    phone: "+19125555050",
+    type: "prospect",
+    universes: ["Prospectos general", "Prospectos auto"],
+  },
 ];
 
 const ENDPOINT = "/api/nova";
@@ -123,7 +233,7 @@ function currentTime() {
 function formatInlineWhatsApp(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
   const tokenPattern =
-    /```([^`\n]+)```|`([^`\n]+)`|\*([^*\n]+)\*|(?<![\p{L}\p{N}])_([^_\n]+)_(?![\p{L}\p{N}])|~([^~\n]+)~/gu;
+    /```([^`\n]+)```|`([^`\n]+)`|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|(?<![\p{L}\p{N}])_([^_\n]+)_(?![\p{L}\p{N}])|~([^~\n]+)~/gu;
   let cursor = 0;
   let match: RegExpExecArray | null;
 
@@ -132,15 +242,15 @@ function formatInlineWhatsApp(text: string): ReactNode[] {
       parts.push(text.slice(cursor, match.index));
     }
 
-    const content = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5] ?? "";
+    const content = match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5] ?? match[6] ?? "";
     const key = `${match.index}-${match[0]}`;
-    if (match[1]) {
-      parts.push(<code className="whatsapp-code" key={key}>{content}</code>);
-    } else if (match[2]) {
+    if (match[1] || match[2]) {
       parts.push(<code className="whatsapp-code" key={key}>{content}</code>);
     } else if (match[3]) {
       parts.push(<strong key={key}>{formatInlineWhatsApp(content)}</strong>);
     } else if (match[4]) {
+      parts.push(<strong key={key}>{formatInlineWhatsApp(content)}</strong>);
+    } else if (match[5]) {
       parts.push(<em key={key}>{formatInlineWhatsApp(content)}</em>);
     } else {
       parts.push(<del key={key}>{formatInlineWhatsApp(content)}</del>);
@@ -157,16 +267,28 @@ function formatInlineWhatsApp(text: string): ReactNode[] {
 }
 
 function formatWhatsAppMessage(text: string): ReactNode {
-  return text.split("\n").map((line, index) => (
-    <Fragment key={index}>
-      {formatInlineWhatsApp(line)}
-      {index < text.split("\n").length - 1 && <br />}
-    </Fragment>
-  ));
+  const lines = text.split(/\n/);
+  return lines.map((line, index) => {
+    const normalizedLine = line.trimEnd();
+    const hasListMarker = /^\s*(?:[-*•]|\d+\.)\s+/u.test(normalizedLine);
+    const hasHashMarker = /^\s*#\S/u.test(normalizedLine);
+
+    return (
+      <Fragment key={`${index}-${normalizedLine}`}>
+        {hasListMarker || hasHashMarker ? (
+          <span className="whatsapp-line whatsapp-list-line">{formatInlineWhatsApp(normalizedLine)}</span>
+        ) : (
+          formatInlineWhatsApp(normalizedLine)
+        )}
+        {index < lines.length - 1 && <br />}
+      </Fragment>
+    );
+  });
 }
 
 function App() {
   const [selectedProfile, setSelectedProfile] = useState("oscar");
+  const [selectedUniverse, setSelectedUniverse] = useState("Clientes en general");
   const [customPhone, setCustomPhone] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -388,6 +510,11 @@ function App() {
 
   function handleProfileChange(profileId: string) {
     setSelectedProfile(profileId);
+    const nextProfile = PROFILES.find((profile) => profile.id === profileId);
+    const generalUniverse = nextProfile?.universes.find((universe) =>
+      universe === "Clientes en general" || universe === "Prospectos general"
+    );
+    setSelectedUniverse(generalUniverse || nextProfile?.universes[0] || "");
     setError("");
   }
 
@@ -664,7 +791,7 @@ function App() {
     if (turn.agent && agents.at(-1) !== turn.agent) agents.push(turn.agent);
     return agents;
   }, []);
-  const isKnownClient = ["adrian", "axel", "oscar"].includes(selectedProfile);
+  const isKnownClient = selectedProfileData?.type === "client";
   const selectedProfileName = selectedProfileData?.name || "Perfil personalizado";
   const attentionSummary =
     escalatedTurns > 0
@@ -712,7 +839,13 @@ function App() {
             <p className="eyebrow">Nova Insure</p>
             <h1>Simulador de WhatsApp</h1>
           </div>
-          <div className="connection-pill"><span /> Proxy seguro · /api/nova</div>
+          <div className="topbar-status">
+            <div className="connection-pill"><span /> Proxy seguro · /api/nova</div>
+            <div className="endpoint-note topbar-endpoint-note">
+              <span className="status-dot" />
+              <div><strong>Nova Bot</strong><small>Proxy de API · clave protegida</small></div>
+            </div>
+          </div>
         </header>
 
         <div className="workspace">
@@ -738,11 +871,23 @@ function App() {
               value={selectedProfile}
               onChange={(event) => handleProfileChange(event.target.value)}
             >
-              {PROFILES.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.emoji} {profile.name} · {profile.phone || "Ingresa un teléfono"}
-                </option>
-              ))}
+              <optgroup label="Cliente">
+                {PROFILES.filter((profile) => profile.type === "client").map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.emoji} {profile.name} · {profile.phone}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="No Cliente">
+                {PROFILES.filter((profile) => profile.type === "prospect").map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.emoji} {profile.name} · {profile.phone}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Custom">
+                <option value="custom">✏️ Ingresa un teléfono</option>
+              </optgroup>
             </select>
             {selectedProfile === "custom" ? (
               <>
@@ -761,14 +906,36 @@ function App() {
                 <p className="hint">Incluye código de país, por ejemplo +52.</p>
               </>
             ) : (
-              <p className="selected-phone">Teléfono: {phone}</p>
+              <>
+                {selectedProfileData && (
+                  <div className="profile-tags" aria-label="Clasificación del perfil de prueba">
+                    <span
+                      className={`profile-tag branch-tag ${selectedProfileData.type}`}
+                      data-testid="profile-branch-tag"
+                    >
+                      {selectedProfileData.type === "client" ? "Cliente" : "No Cliente"}
+                    </span>
+                    <select
+                      id="profile-universe"
+                      className="profile-tag universe-tag"
+                      data-testid="profile-universe-select"
+                      aria-label="Universo de prueba"
+                      value={selectedUniverse}
+                      onChange={(event) => setSelectedUniverse(event.target.value)}
+                    >
+                      {selectedProfileData.universes.map((universe) => (
+                        <option key={universe} value={universe}>
+                          {universe}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <p className="selected-phone">Teléfono: {phone}</p>
+              </>
             )}
           </div>
           <div className="config-actions">
-            <div className="endpoint-note">
-              <span className="status-dot" />
-              <div><strong>Nova Bot</strong><small>Proxy de API · clave protegida</small></div>
-            </div>
             <button
               className="clear-button"
               id="clear-conversation-button"

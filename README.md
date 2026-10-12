@@ -35,11 +35,14 @@ pnpm dev
 
 La aplicación permite simular conversaciones con un número de teléfono, visualizar las respuestas con formato estilo WhatsApp y guardar el historial como PNG, JPEG o TXT. También puede exportar la conversación junto con el panel completo de tracking en PNG, o generar un TXT con la transcripción, métricas por turno y snapshot JSON. El panel de métricas registra por cada respuesta el estado HTTP, latencia real, estado reportado por la API, agente, intención, fase, atención humana y `sessionId`; también resume errores, escalaciones, agentes observados y latencia promedio. Si el endpoint omite un campo, la interfaz lo muestra como no reportado en lugar de inferirlo.
 
+El selector incluye 4 perfiles de Cliente y 8 de No Cliente del catálogo de pruebas, agrupados junto con la opción Custom para números libres. Al seleccionar un perfil de prueba se muestran etiquetas para la rama y el universo; el universo se puede cambiar entre las opciones asignadas a ese perfil. El encabezado muestra el estado del proxy y la protección de la clave junto a Nova Bot.
+
 ### Automatización RPA
 
 Los controles principales exponen identificadores estables (`data-testid`):
 
 - `profile-select`, `custom-phone-input`
+- `profile-branch-tag`, `profile-universe-select`
 - `message-input`, `send-message`
 - `attach-audio`, `audio-file-input`
 - `attach-image`, `image-file-input`
