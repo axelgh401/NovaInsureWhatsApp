@@ -138,9 +138,9 @@ function describeHttpFailure(
 
   if (code === "BOT_TIMEOUT") {
     return {
-      title: "El bot tardó demasiado en responder",
+      title: "Tiempo de espera en el bot",
       message:
-        `El servidor del simulador sí alcanzó al servicio del bot, pero no recibió respuesta dentro de ${formatElapsed(BOT_REQUEST_TIMEOUT_MS / 1000)}. Esto apunta a la demora del servicio, no a la conexión de internet del colaborador. Antes de reenviar, confirma si el bot ya procesó el mensaje.`,
+        `El bot no respondió en el tiempo límite (${formatElapsed(BOT_REQUEST_TIMEOUT_MS / 1000)}). Es una demora del servicio, no de tu conexión. Verifica si el mensaje se procesó antes de reenviar.`,
       source: sourceLabel,
       code,
       requestId: data?.requestId || requestId,
@@ -151,9 +151,9 @@ function describeHttpFailure(
 
   if (code === "BOT_CONNECTION_FAILED") {
     return {
-      title: "El simulador no pudo conectar con el bot",
+      title: "Error de conexión con el bot",
       message:
-        "La solicitud llegó al servidor del simulador, pero este no logró comunicarse con el servicio del bot. El problema está entre el simulador y el bot, no en la conexión local del USUARIO.",
+        "El simulador no logró comunicarse con el bot. Es un problema interno del sistema, no de tu conexión local.",
       source: sourceLabel,
       code,
       requestId: data?.requestId || requestId,
@@ -164,9 +164,9 @@ function describeHttpFailure(
 
   if (code === "BOT_REPORTED_FAILURE") {
     return {
-      title: "El bot indicó que no pudo completar la solicitud",
+      title: "Fallo interno en el bot",
       message:
-        "La conexión con el servicio del bot respondió, pero el propio bot reportó que no pudo completar esta solicitud.",
+        "Hay conexión con el bot, pero reportó un error al intentar procesar la solicitud.",
       source: sourceLabel,
       code,
       requestId: data?.requestId || requestId,
@@ -177,8 +177,8 @@ function describeHttpFailure(
 
   if (source === "bot") {
     return {
-      title: "El servicio del bot respondió con un error",
-      message: `El servidor del simulador recibió una respuesta del bot, pero el bot no pudo completar la solicitud (HTTP ${response.status}).`,
+      title: "Error en respuesta del bot",
+      message: `El bot respondió indicando que falló al procesar la solicitud (Error HTTP ${response.status}).`,
       source: sourceLabel,
       code,
       requestId: data?.requestId || requestId,
@@ -189,8 +189,8 @@ function describeHttpFailure(
 
   if (response.status >= 500) {
     return {
-      title: "El servidor del simulador respondió con un error",
-      message: `La solicitud llegó al servidor, pero este no pudo completarla (HTTP ${response.status}). Sin más información del servidor no es posible confirmar si el fallo ocurrió en el simulador o en el servicio del bot.`,
+      title: "Error interno del servidor",
+      message: `Ocurrió un fallo inesperado en el servidor del simulador al procesar la solicitud (Error HTTP ${response.status}).`,
       source: sourceLabel,
       code,
       requestId: data?.requestId || requestId,
@@ -200,8 +200,11 @@ function describeHttpFailure(
   }
 
   return {
-    title: "No se pudo completar la solicitud",
-    message: data?.message || data?.error || `El servidor respondió con HTTP ${response.status}.`,
+    title: "Solicitud rechazada",
+    message:
+      data?.message ||
+      data?.error ||
+      `El servidor respondió con un error (HTTP ${response.status}).`,
     source: sourceLabel,
     code,
     requestId: data?.requestId || requestId,
@@ -688,8 +691,9 @@ function App() {
       const latencyMs = performance.now() - requestStartedAt;
       const failure: RequestFailure = clientTimedOut
         ? {
-            title: "La solicitud superó el tiempo de espera",
-            message: `El navegador esperó ${CLIENT_REQUEST_TIMEOUT_LABEL} sin recibir respuesta del servidor del simulador. No podemos confirmar si el bot alcanzó a procesar el mensaje. Revisa tu conexión y confirma si hubo respuesta antes de volver a enviarlo.`,
+            title: "Tiempo de espera en el navegador",
+            message:
+              "El navegador superó el tiempo máximo de espera sin respuesta del simulador. Revisa tu conexión antes de reintentar.",
             source: "Conexión del navegador con el servidor del simulador",
             code: "SIMULATOR_REQUEST_TIMEOUT",
             requestId,
@@ -697,9 +701,9 @@ function App() {
             detail,
           }
         : {
-            title: "No se recibió respuesta del simulador",
+            title: "Fallo de red local",
             message:
-              "Puede ser un problema de internet o VPN del colaborador, del navegador, o que el servidor del simulador no esté disponible. Como no llegó una respuesta HTTP, no es posible distinguir automáticamente cuál de ellos falló.",
+              "No se pudo conectar con el simulador. Revisa tu internet o VPN, o el servicio podría estar inactivo temporalmente.",
             source: "Conexión del navegador con el servidor del simulador",
             code: "SIMULATOR_CONNECTION_FAILED",
             requestId,
