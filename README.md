@@ -37,12 +37,15 @@ La aplicación permite simular conversaciones con un número de teléfono, visua
 
 El selector incluye 4 perfiles de Cliente y 8 de No Cliente del catálogo de pruebas, agrupados junto con la opción Custom para números libres. Al seleccionar un perfil de prueba se muestran etiquetas para la rama y el universo; el universo se puede cambiar entre las opciones asignadas a ese perfil. El encabezado muestra el estado del proxy y la protección de la clave junto a Nova Bot.
 
+La espera del servicio del bot es de hasta 120 segundos; el navegador muestra el tiempo transcurrido y espera hasta 130 segundos para dar margen a la respuesta del proxy. En Vercel, la función del simulador tiene un límite configurado de 150 segundos. Los errores muestran un origen estimado (navegador, servidor del simulador o bot), HTTP/código e ID de soporte. Si el navegador no recibe ninguna respuesta HTTP, la app aclara que no puede determinar por sí sola si falló la conexión local o si el servidor dejó de responder.
+
 ### Automatización RPA
 
 Los controles principales exponen identificadores estables (`data-testid`):
 
 - `profile-select`, `custom-phone-input`
 - `profile-branch-tag`, `profile-universe-select`
+- `case-number-input`
 - `message-input`, `send-message`
 - `attach-audio`, `audio-file-input`
 - `attach-image`, `image-file-input`
@@ -54,10 +57,12 @@ Los controles principales exponen identificadores estables (`data-testid`):
 - `metric-turn-count`, `metric-api-result`, `metric-human-attention`, `metric-average-latency`
 - `tracked-turn`, `turn-http-status`, `turn-agent`, `turn-phase`, `turn-intent`
 - `turn-human-attention`, `turn-latency`, `turn-question`, `turn-response`, `turn-session-id`
+- `turn-branch`, `turn-universe`, `turn-case-number`
+- `request-progress`, `request-error`
 
-`conversation-tracking-json` es el contrato RPA recomendado: contiene un snapshot JSON con `schemaVersion`, el perfil, los contadores agregados y todos los turnos. Cada turno tiene `status` (`pending`, `success`, `failed` o `unverified`), ID de correlación, pregunta, respuesta, timestamps, latencia en milisegundos, HTTP, estado API, agente, intención, fase, atención humana, sesión y error. Los datos omitidos por la API son `null`; no se deben inferir.
+`conversation-tracking-json` es el contrato RPA recomendado: contiene un snapshot JSON con `schemaVersion`, los datos del perfil (`id`, `name`, `phone`, `branch` y `universe`), `caseNumber` a nivel raíz, los contadores agregados y todos los turnos. Cada turno conserva también el perfil, la rama, el universo y el número de caso vigentes al enviarlo, además de `status` (`pending`, `success`, `failed` o `unverified`), ID de correlación, pregunta, respuesta, timestamps, latencia en milisegundos, HTTP, estado API, agente, intención, fase, atención humana, sesión y error. Los errores del turno incluyen `errorSource`, `errorCode` y `errorDetail` para diagnóstico. Para un perfil Custom, `branch` vale `Custom` y `universe` es `null`; un número de caso no indicado también es `null`. Estos metadatos son locales y no forman parte de la solicitud enviada al bot. Los datos omitidos por la API son `null`; no se deben inferir.
 
-Las exportaciones combinadas se identifican como `save-conversation-tracking-png` (chat completo y panel de métricas en una imagen lateral) y `save-conversation-tracking-txt` (transcripción, resumen, desglose por turno y snapshot JSON).
+Las exportaciones de conversación PNG/JPEG y TXT incluyen los metadatos de perfil, rama, universo y número de caso. Las exportaciones combinadas se identifican como `save-conversation-tracking-png` (chat completo, metadatos y panel de métricas en una imagen lateral) y `save-conversation-tracking-txt` (transcripción, metadatos, resumen, desglose por turno y snapshot JSON).
 
 Ejemplo con Playwright:
 

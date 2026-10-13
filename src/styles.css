@@ -224,6 +224,27 @@ footer { margin-top: 14px; color: #98aaa5; text-align: center; font-size: 11px; 
 .profile-config .universe-tag { width: auto; min-width: 0; flex: 1 1 160px; padding: 5px 25px 5px 9px; box-shadow: none; font-size: 10px; }
 .universe-tag:hover { border-color: #a8d0c2; background-color: #fff; }
 .universe-tag:focus { border-color: #76bbaa; box-shadow: 0 0 0 3px #76bbaa22; }
+.typing { align-items: center; flex-wrap: wrap; }
+.typing-label { color: #6f847d; font-size: 10px; }
+.request-failure { display: grid; gap: 6px; padding: 11px 15px; line-height: 1.45; }
+.request-failure > strong { font-size: 12px; }
+.request-failure > p { margin: 0; }
+.request-failure-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: #87514b; font-size: 10px; }
+.request-failure-meta span { overflow-wrap: anywhere; }
+.request-failure details { margin-top: 2px; color: #87514b; font-size: 10px; }
+.request-failure details summary { cursor: pointer; font-weight: 700; }
+.request-failure details code { display: block; max-height: 90px; margin-top: 5px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.turn-error span { display: block; margin-top: 3px; font-size: 9px; }
+.profile-config .case-number-label { margin: 14px 0 7px; }
+.case-number-label span { color: #81958f; font-size: 10px; font-weight: 500; }
+.profile-config #case-number { padding: 10px 12px; font-size: 12px; }
+.evidence-metadata { display: grid; gap: 9px; padding: 12px 15px; border-bottom: 1px solid #dce9e3; background: #f6fbf8; color: #173b38; font-family: "DM Sans", sans-serif; }
+.evidence-metadata > strong { font-family: Manrope, sans-serif; font-size: 12px; }
+.evidence-metadata-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; }
+.evidence-metadata-item { min-width: 0; }
+.evidence-metadata-item dt { margin-bottom: 2px; color: #748b83; font-size: 9px; }
+.evidence-metadata-item dd { margin: 0; color: #304d44; font-size: 10px; font-weight: 700; overflow-wrap: anywhere; }
+.conversation-export-stage { position: fixed; top: 0; left: -100000px; z-index: -1; display: block; pointer-events: none; }
 @media (max-width: 420px) {
   .tracking-export-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

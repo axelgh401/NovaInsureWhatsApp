@@ -10,14 +10,33 @@ type ApiResponse = {
   phase?: string | number;
   sessionId?: string | number;
   error?: string;
+  code?: string;
+  source?: string;
+  detail?: string;
+  requestId?: string;
+  upstreamStatus?: number;
+};
+
+type RequestFailure = {
+  title: string;
+  message: string;
+  source: string;
+  code: string;
+  requestId: string;
+  httpStatus: number | null;
+  detail: string | null;
 };
 
 type TrackedTurn = {
   id: string;
   requestId: string;
+  profileId: string;
   question: string;
   profileName: string;
   phone: string;
+  branch: string;
+  universe: string | null;
+  caseNumber: string | null;
   response: string;
   startedAt: string;
   completedAt: string | null;
@@ -30,6 +49,9 @@ type TrackedTurn = {
   phase: string | null;
   sessionId: string | null;
   error: string | null;
+  errorSource: string | null;
+  errorCode: string | null;
+  errorDetail: string | null;
 };
 
 function responseFlag(value: ApiResponse["success"]): boolean | null {
@@ -72,6 +94,119 @@ function responseObject(value: unknown): ApiResponse | null {
     phase: textOrNumber(record.phase),
     sessionId: textOrNumber(record.sessionId),
     error: textField(record.error),
+    code: typeof record.code === "string" ? record.code : undefined,
+    source: typeof record.source === "string" ? record.source : undefined,
+    detail: textField(record.detail),
+    requestId: typeof record.requestId === "string" ? record.requestId : undefined,
+    upstreamStatus: typeof record.upstreamStatus === "number" ? record.upstreamStatus : undefined,
+  };
+}
+
+const BOT_REQUEST_TIMEOUT_MS = 120_000;
+const CLIENT_REQUEST_TIMEOUT_MS = 130_000;
+const CLIENT_REQUEST_TIMEOUT_LABEL = "2 min 10 s";
+
+function formatElapsed(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes > 0
+    ? `${minutes} min ${String(remainingSeconds).padStart(2, "0")} s`
+    : `${remainingSeconds} s`;
+}
+
+function describeHttpFailure(
+  response: Response,
+  data: ApiResponse | null,
+  requestId: string,
+): RequestFailure {
+  const code =
+    data?.code ||
+    (response.ok && (responseFlag(data?.success) === false || Boolean(data?.error))
+      ? "BOT_REPORTED_FAILURE"
+      : "HTTP_REQUEST_FAILED");
+  const source =
+    data?.source ||
+    response.headers.get("x-nova-error-source") ||
+    (response.ok ? "bot" : "simulator");
+  const sourceLabel =
+    source === "bot"
+      ? "Servicio del bot Nova"
+      : source === "simulator"
+        ? "Servidor del simulador"
+        : source;
+  const detail = data?.detail || data?.error || data?.message || null;
+
+  if (code === "BOT_TIMEOUT") {
+    return {
+      title: "El bot tardó demasiado en responder",
+      message:
+        `El servidor del simulador sí alcanzó al servicio del bot, pero no recibió respuesta dentro de ${formatElapsed(BOT_REQUEST_TIMEOUT_MS / 1000)}. Esto apunta a la demora del servicio, no a la conexión de internet del colaborador. Antes de reenviar, confirma si el bot ya procesó el mensaje.`,
+      source: sourceLabel,
+      code,
+      requestId: data?.requestId || requestId,
+      httpStatus: response.status,
+      detail,
+    };
+  }
+
+  if (code === "BOT_CONNECTION_FAILED") {
+    return {
+      title: "El simulador no pudo conectar con el bot",
+      message:
+        "La solicitud llegó al servidor del simulador, pero este no logró comunicarse con el servicio del bot. El problema está entre el simulador y el bot, no en la conexión local del USUARIO.",
+      source: sourceLabel,
+      code,
+      requestId: data?.requestId || requestId,
+      httpStatus: response.status,
+      detail,
+    };
+  }
+
+  if (code === "BOT_REPORTED_FAILURE") {
+    return {
+      title: "El bot indicó que no pudo completar la solicitud",
+      message:
+        "La conexión con el servicio del bot respondió, pero el propio bot reportó que no pudo completar esta solicitud.",
+      source: sourceLabel,
+      code,
+      requestId: data?.requestId || requestId,
+      httpStatus: response.status,
+      detail,
+    };
+  }
+
+  if (source === "bot") {
+    return {
+      title: "El servicio del bot respondió con un error",
+      message: `El servidor del simulador recibió una respuesta del bot, pero el bot no pudo completar la solicitud (HTTP ${response.status}).`,
+      source: sourceLabel,
+      code,
+      requestId: data?.requestId || requestId,
+      httpStatus: response.status,
+      detail,
+    };
+  }
+
+  if (response.status >= 500) {
+    return {
+      title: "El servidor del simulador respondió con un error",
+      message: `La solicitud llegó al servidor, pero este no pudo completarla (HTTP ${response.status}). Sin más información del servidor no es posible confirmar si el fallo ocurrió en el simulador o en el servicio del bot.`,
+      source: sourceLabel,
+      code,
+      requestId: data?.requestId || requestId,
+      httpStatus: response.status,
+      detail,
+    };
+  }
+
+  return {
+    title: "No se pudo completar la solicitud",
+    message: data?.message || data?.error || `El servidor respondió con HTTP ${response.status}.`,
+    source: sourceLabel,
+    code,
+    requestId: data?.requestId || requestId,
+    httpStatus: response.status,
+    detail,
   };
 }
 
@@ -113,6 +248,15 @@ type Profile = {
   phone: string;
   type: "client" | "prospect";
   universes: string[];
+};
+
+type EvidenceMetadata = {
+  profileId: string;
+  profileName: string;
+  phone: string;
+  branch: string;
+  universe: string | null;
+  caseNumber: string | null;
 };
 
 const PROFILES: Profile[] = [
@@ -223,6 +367,48 @@ const PROFILES: Profile[] = [
 
 const ENDPOINT = "/api/nova";
 
+function evidenceMetadataLines(metadata: EvidenceMetadata) {
+  return [
+    `Perfil: ${metadata.profileName}`,
+    `Teléfono: ${metadata.phone || "Sin definir"}`,
+    `Rama: ${metadata.branch}`,
+    `Universo: ${metadata.universe || "No aplica"}`,
+    `Número de caso: ${metadata.caseNumber || "No indicado"}`,
+  ];
+}
+
+function createEvidenceMetadataElement(metadata: EvidenceMetadata) {
+  const section = document.createElement("section");
+  section.className = "evidence-metadata";
+  section.setAttribute("aria-label", "Metadatos de la prueba");
+
+  const heading = document.createElement("strong");
+  heading.textContent = "Datos de la prueba";
+  section.append(heading);
+
+  const list = document.createElement("dl");
+  list.className = "evidence-metadata-grid";
+  const fields = [
+    ["Perfil", metadata.profileName],
+    ["Teléfono", metadata.phone || "Sin definir"],
+    ["Rama", metadata.branch],
+    ["Universo", metadata.universe || "No aplica"],
+    ["Número de caso", metadata.caseNumber || "No indicado"],
+  ];
+  fields.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "evidence-metadata-item";
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const detail = document.createElement("dd");
+    detail.textContent = value;
+    item.append(term, detail);
+    list.append(item);
+  });
+  section.append(list);
+  return section;
+}
+
 function currentTime() {
   return new Intl.DateTimeFormat("es-MX", {
     hour: "2-digit",
@@ -290,14 +476,17 @@ function App() {
   const [selectedProfile, setSelectedProfile] = useState("oscar");
   const [selectedUniverse, setSelectedUniverse] = useState("Clientes en general");
   const [customPhone, setCustomPhone] = useState("");
+  const [caseNumber, setCaseNumber] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [turns, setTurns] = useState<TrackedTurn[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isExporting, setIsExporting] = useState<
     "png" | "jpeg" | "txt" | "tracking-png" | "tracking-txt" | null
   >(null);
   const [error, setError] = useState("");
+  const [requestFailure, setRequestFailure] = useState<RequestFailure | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const chatExportRef = useRef<HTMLDivElement>(null);
   const metricsExportRef = useRef<HTMLElement>(null);
@@ -307,6 +496,16 @@ function App() {
   const selectedProfileData = PROFILES.find((profile) => profile.id === selectedProfile);
   const phone = selectedProfileData?.phone || customPhone;
   const trackedProfile = selectedProfileData?.name || "Perfil personalizado";
+  const evidenceMetadata: EvidenceMetadata = {
+    profileId: selectedProfile,
+    profileName: trackedProfile,
+    phone: phone.trim(),
+    branch: selectedProfileData
+      ? selectedProfileData.type === "client" ? "Cliente" : "No Cliente"
+      : "Custom",
+    universe: selectedProfileData ? selectedUniverse : null,
+    caseNumber: caseNumber.trim() || null,
+  };
 
   useEffect(() => {
     conversationRef.current?.scrollTo({
@@ -315,6 +514,19 @@ function App() {
     });
   }, [messages, isSending]);
 
+  useEffect(() => {
+    if (!isSending) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const startedAt = performance.now();
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((performance.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [isSending]);
+
   useEffect(
     () => () => {
       attachmentUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -322,13 +534,23 @@ function App() {
     [],
   );
 
+  function clearErrors() {
+    setError("");
+    setRequestFailure(null);
+  }
+
+  function showLocalError(message: string) {
+    setRequestFailure(null);
+    setError(message);
+  }
+
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     const trimmedPhone = phone.trim();
     const trimmedMessage = message.trim();
 
     if (!trimmedPhone || !trimmedMessage || isSending) return;
-    setError("");
+    clearErrors();
     setMessage("");
     const outgoingId = crypto.randomUUID();
     setMessages((current) => [
@@ -344,14 +566,14 @@ function App() {
     const turnId = crypto.randomUUID();
     const requestId = crypto.randomUUID();
     const startedAt = new Date().toISOString();
+    const turnMetadata = { ...evidenceMetadata };
     setTurns((current) => [
       ...current,
       {
         id: turnId,
         requestId,
         question: trimmedMessage,
-        profileName: trackedProfile,
-        phone: trimmedPhone,
+        ...turnMetadata,
         response: "",
         startedAt,
         completedAt: null,
@@ -364,14 +586,24 @@ function App() {
         phase: null,
         sessionId: null,
         error: null,
+        errorSource: null,
+        errorCode: null,
+        errorDetail: null,
       },
     ]);
     setIsSending(true);
     const requestStartedAt = performance.now();
+    const requestController = new AbortController();
+    let clientTimedOut = false;
+    const timeout = window.setTimeout(() => {
+      clientTimedOut = true;
+      requestController.abort();
+    }, CLIENT_REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(ENDPOINT, {
         method: "POST",
+        signal: requestController.signal,
         headers: {
           "Content-Type": "application/json",
           "X-Request-ID": requestId,
@@ -404,6 +636,9 @@ function App() {
         : businessError
           ? responseData?.error || responseData?.message || "El chatbot indicó que la solicitud no fue exitosa."
           : null;
+      const failure = requestError
+        ? describeHttpFailure(response, responseData, requestId)
+        : null;
 
       setTurns((current) =>
         current.map((turn) =>
@@ -420,7 +655,10 @@ function App() {
                 agent: responseValue(responseData?.agent),
                 phase: responseValue(responseData?.phase),
                 sessionId: responseValue(responseData?.sessionId),
-                error: requestError,
+                error: failure?.message || null,
+                errorSource: failure?.source || null,
+                errorCode: failure?.code || null,
+                errorDetail: failure?.detail || null,
               }
             : turn,
         ),
@@ -441,13 +679,33 @@ function App() {
             })
           : updated;
       });
-      if (requestError) setError(requestError);
+      if (failure) setRequestFailure(failure);
     } catch (requestError) {
       const detail =
         requestError instanceof Error
           ? requestError.message
           : "No fue posible contactar al bot.";
       const latencyMs = performance.now() - requestStartedAt;
+      const failure: RequestFailure = clientTimedOut
+        ? {
+            title: "La solicitud superó el tiempo de espera",
+            message: `El navegador esperó ${CLIENT_REQUEST_TIMEOUT_LABEL} sin recibir respuesta del servidor del simulador. No podemos confirmar si el bot alcanzó a procesar el mensaje. Revisa tu conexión y confirma si hubo respuesta antes de volver a enviarlo.`,
+            source: "Conexión del navegador con el servidor del simulador",
+            code: "SIMULATOR_REQUEST_TIMEOUT",
+            requestId,
+            httpStatus: null,
+            detail,
+          }
+        : {
+            title: "No se recibió respuesta del simulador",
+            message:
+              "Puede ser un problema de internet o VPN del colaborador, del navegador, o que el servidor del simulador no esté disponible. Como no llegó una respuesta HTTP, no es posible distinguir automáticamente cuál de ellos falló.",
+            source: "Conexión del navegador con el servidor del simulador",
+            code: "SIMULATOR_CONNECTION_FAILED",
+            requestId,
+            httpStatus: null,
+            detail,
+          };
       setTurns((current) =>
         current.map((turn) =>
           turn.id === turnId
@@ -456,7 +714,10 @@ function App() {
                 response: "",
                 completedAt: new Date().toISOString(),
                 latencyMs,
-                error: detail,
+                error: failure.message,
+                errorSource: failure.source,
+                errorCode: failure.code,
+                errorDetail: failure.detail,
               }
             : turn,
         ),
@@ -466,8 +727,9 @@ function App() {
           item.id === outgoingId ? { ...item, status: "error" as const } : item,
         ),
       );
-      setError(detail);
+      setRequestFailure(failure);
     } finally {
+      window.clearTimeout(timeout);
       setIsSending(false);
     }
   }
@@ -477,7 +739,7 @@ function App() {
     attachmentUrlsRef.current = [];
     setMessages([]);
     setTurns([]);
-    setError("");
+    clearErrors();
   }
 
   function addMediaFiles(event: ChangeEvent<HTMLInputElement>, kind: "audio" | "image") {
@@ -487,9 +749,9 @@ function App() {
 
     const validFiles = files.filter((file) => file.type.startsWith(`${kind}/`));
     if (validFiles.length !== files.length) {
-      setError(`Solo se pueden agregar archivos de ${kind === "audio" ? "audio" : "imagen"}.`);
+      showLocalError(`Solo se pueden agregar archivos de ${kind === "audio" ? "audio" : "imagen"}.`);
     } else {
-      setError("");
+      clearErrors();
     }
     if (validFiles.length === 0) return;
 
@@ -515,7 +777,7 @@ function App() {
       universe === "Clientes en general" || universe === "Prospectos general"
     );
     setSelectedUniverse(generalUniverse || nextProfile?.universes[0] || "");
-    setError("");
+    clearErrors();
   }
 
   async function exportConversation(format: "png" | "jpeg") {
@@ -523,17 +785,36 @@ function App() {
     if (!chat || messages.length === 0 || isExporting) return;
 
     setIsExporting(format);
-    setError("");
+    clearErrors();
+    const stage = document.createElement("div");
+    stage.className = "conversation-export-stage";
 
     try {
       await document.fonts.ready;
-      const fullHeight =
-        (chat.querySelector<HTMLElement>(".chat-header")?.offsetHeight ?? 0) +
-        (conversationRef.current?.scrollHeight ?? 0);
+      const chatClone = chat.cloneNode(true) as HTMLElement;
+      const conversationClone = chatClone.querySelector<HTMLElement>(".conversation");
+      const conversationHeight = conversationRef.current?.scrollHeight ?? 0;
+      chatClone.style.width = `${chat.clientWidth}px`;
+      chatClone.style.height = "auto";
+      chatClone.style.minHeight = "0";
+      chatClone.style.maxHeight = "none";
+      chatClone.style.flex = "none";
+      chatClone.style.overflow = "visible";
+      conversationClone?.style.setProperty("height", `${conversationHeight}px`);
+      conversationClone?.style.setProperty("min-height", "0");
+      conversationClone?.style.setProperty("max-height", "none");
+      conversationClone?.style.setProperty("flex", "none");
+      conversationClone?.style.setProperty("overflow", "visible");
+      chatClone.prepend(createEvidenceMetadataElement(evidenceMetadata));
+      stage.append(chatClone);
+      document.body.append(stage);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      const fullHeight = chatClone.scrollHeight;
       const options = {
         backgroundColor: "#efeae2",
         pixelRatio: 2,
-        width: chat.scrollWidth,
+        width: chatClone.scrollWidth,
         height: fullHeight,
         style: {
           height: `${fullHeight}px`,
@@ -543,8 +824,8 @@ function App() {
       };
       const dataUrl =
         format === "png"
-          ? await toPng(chat, options)
-          : await toJpeg(chat, { ...options, quality: 0.95 });
+          ? await toPng(chatClone, options)
+          : await toJpeg(chatClone, { ...options, quality: 0.95 });
       const link = document.createElement("a");
       link.download = `nova-insure-conversacion-${new Date().toISOString().slice(0, 10)}.${format}`;
       link.href = dataUrl;
@@ -554,8 +835,9 @@ function App() {
         exportError instanceof Error
           ? exportError.message
           : "No fue posible generar la imagen.";
-      setError(`No se pudo exportar la conversación: ${detail}`);
+      showLocalError(`No se pudo exportar la conversación: ${detail}`);
     } finally {
+      stage.remove();
       setIsExporting(null);
     }
   }
@@ -564,12 +846,12 @@ function App() {
     if (messages.length === 0 || isExporting) return;
 
     setIsExporting("txt");
-    setError("");
+    clearErrors();
 
     try {
       const transcript = [
         "NOVA INSURE · CONVERSACIÓN DE WHATSAPP",
-        `Número: ${phone.trim()}`,
+        ...evidenceMetadataLines(evidenceMetadata),
         `Fecha de exportación: ${new Intl.DateTimeFormat("es-MX", {
           dateStyle: "long",
           timeStyle: "short",
@@ -596,7 +878,7 @@ function App() {
         exportError instanceof Error
           ? exportError.message
           : "No fue posible generar el archivo de texto.";
-      setError(`No se pudo exportar la conversación: ${detail}`);
+      showLocalError(`No se pudo exportar la conversación: ${detail}`);
     } finally {
       setIsExporting(null);
     }
@@ -608,7 +890,7 @@ function App() {
     if (!chat || !metrics || messages.length === 0 || isExporting) return;
 
     setIsExporting("tracking-png");
-    setError("");
+    clearErrors();
     const stage = document.createElement("div");
     stage.className = "tracking-export-stage";
 
@@ -623,6 +905,7 @@ function App() {
       const conversationHeight = conversationRef.current?.scrollHeight ?? 0;
       const chatHeight = (chatHeaderClone?.offsetHeight ?? 0) + conversationHeight;
 
+      metricsClone.prepend(createEvidenceMetadataElement(evidenceMetadata));
       chatClone.classList.add("tracking-export-chat");
       chatClone.style.height = `${chatHeight}px`;
       chatClone.style.minHeight = "0";
@@ -677,7 +960,7 @@ function App() {
         exportError instanceof Error
           ? exportError.message
           : "No fue posible generar la imagen.";
-      setError(`No se pudo exportar conversación y tracking como PNG: ${detail}`);
+      showLocalError(`No se pudo exportar conversación y tracking como PNG: ${detail}`);
     } finally {
       stage.remove();
       setIsExporting(null);
@@ -688,7 +971,7 @@ function App() {
     if (messages.length === 0 || isExporting) return;
 
     setIsExporting("tracking-txt");
-    setError("");
+    clearErrors();
 
     try {
       const exportDate = new Intl.DateTimeFormat("es-MX", {
@@ -705,6 +988,11 @@ function App() {
       const turnReports = trackedTurns.map((turn) =>
         [
           `Turno ${turn.turnNumber} · ${turn.status.toUpperCase()}`,
+          `Perfil: ${turn.profileName}`,
+          `Teléfono: ${turn.phone || "Sin definir"}`,
+          `Rama: ${turn.branch}`,
+          `Universo: ${turn.universe || "No aplica"}`,
+          `Número de caso: ${turn.caseNumber || "No indicado"}`,
           `Solicitud: ${turn.question}`,
           `Respuesta: ${turn.response || "No se recibió respuesta."}`,
           `HTTP: ${turn.httpStatus ?? "Sin respuesta"}`,
@@ -719,12 +1007,14 @@ function App() {
           `Inicio: ${turn.startedAt}`,
           `Fin: ${turn.completedAt ?? "En curso"}`,
           `Error: ${turn.error ?? "Ninguno"}`,
+          `Origen del error: ${turn.errorSource ?? "Ninguno"}`,
+          `Código del error: ${turn.errorCode ?? "Ninguno"}`,
+          `Detalle técnico: ${turn.errorDetail ?? "Ninguno"}`,
         ].join("\n"),
       );
       const transcript = [
         "NOVA INSURE · CONVERSACIÓN + TRACKING",
-        `Perfil: ${selectedProfileName}`,
-        `Número: ${phone.trim()}`,
+        ...evidenceMetadataLines(evidenceMetadata),
         `Fecha de exportación: ${exportDate}`,
         "",
         "=== CONVERSACIÓN ===",
@@ -761,7 +1051,7 @@ function App() {
         exportError instanceof Error
           ? exportError.message
           : "No fue posible generar el archivo de texto.";
-      setError(`No se pudo exportar conversación y tracking como TXT: ${detail}`);
+      showLocalError(`No se pudo exportar conversación y tracking como TXT: ${detail}`);
     } finally {
       setIsExporting(null);
     }
@@ -810,7 +1100,10 @@ function App() {
       id: selectedProfile,
       name: selectedProfileName,
       phone: phone.trim(),
+      branch: evidenceMetadata.branch,
+      universe: evidenceMetadata.universe,
     },
+    caseNumber: evidenceMetadata.caseNumber,
     summary: {
       totalTurns: turns.length,
       completedTurns: completedTurns.length,
@@ -934,6 +1227,18 @@ function App() {
                 <p className="selected-phone">Teléfono: {phone}</p>
               </>
             )}
+            <label className="case-number-label" htmlFor="case-number">
+              Número de caso <span>(opcional)</span>
+            </label>
+            <input
+              id="case-number"
+              data-testid="case-number-input"
+              aria-label="Número de caso"
+              value={caseNumber}
+              onChange={(event) => setCaseNumber(event.target.value)}
+              placeholder="Ej. CL-F01"
+              autoComplete="off"
+            />
           </div>
           <div className="config-actions">
             <button
@@ -1024,7 +1329,9 @@ function App() {
                 <div className="avatar">N</div>
                 <div className="contact">
                   <strong>Nova Insure</strong>
-                  <span>{isSending ? "escribiendo..." : "en línea"}</span>
+                  <span>
+                    {isSending ? `esperando respuesta · ${formatElapsed(elapsedSeconds)}` : "en línea"}
+                  </span>
                 </div>
                 <div className="chat-actions"><span>⌕</span><span>⋮</span></div>
               </div>
@@ -1092,10 +1399,36 @@ function App() {
                     </div>
                   </div>
                 ))}
-                {isSending && <div className="typing"><i /><i /><i /></div>}
+                {isSending && (
+                  <div className="typing" role="status" aria-live="polite" data-testid="request-progress">
+                    <i /><i /><i />
+                    <span>Esperando respuesta del bot · {formatElapsed(elapsedSeconds)} / {CLIENT_REQUEST_TIMEOUT_LABEL}</span>
+                  </div>
+                )}
               </div>
             </div>
-            {error && <div className="error-banner" role="alert" data-testid="request-error">⚠ {error}</div>}
+            {requestFailure ? (
+              <div className="error-banner request-failure" role="alert" data-testid="request-error">
+                <strong>⚠ {requestFailure.title}</strong>
+                <p>{requestFailure.message}</p>
+                <div className="request-failure-meta">
+                  <span><b>Origen:</b> {requestFailure.source}</span>
+                  {requestFailure.httpStatus !== null && (
+                    <span><b>HTTP:</b> {requestFailure.httpStatus}</span>
+                  )}
+                  <span><b>Código:</b> {requestFailure.code}</span>
+                  <span><b>ID de soporte:</b> {requestFailure.requestId}</span>
+                </div>
+                {requestFailure.detail && (
+                  <details>
+                    <summary>Detalle técnico para soporte</summary>
+                    <code>{requestFailure.detail}</code>
+                  </details>
+                )}
+              </div>
+            ) : error ? (
+              <div className="error-banner" role="alert" data-testid="request-error">⚠ {error}</div>
+            ) : null}
             <form
               className="composer"
               id="message-composer"
@@ -1280,6 +1613,12 @@ function App() {
                       data-human-attention={turn.humanAttention === null ? "" : String(turn.humanAttention)}
                       data-session-id={turn.sessionId ?? ""}
                       data-latency-ms={turn.latencyMs ?? ""}
+                      data-profile-id={turn.profileId}
+                      data-branch={turn.branch}
+                      data-universe={turn.universe ?? ""}
+                      data-case-number={turn.caseNumber ?? ""}
+                      data-error-source={turn.errorSource ?? ""}
+                      data-error-code={turn.errorCode ?? ""}
                       data-started-at={turn.startedAt}
                       data-completed-at={turn.completedAt ?? ""}
                       aria-label={`Turno ${index + 1} · ${getTurnStatus(turn)}`}
@@ -1298,7 +1637,13 @@ function App() {
                         <span className="turn-intent" data-testid="turn-intent" data-value={turn.intent ?? ""}><b>Intención:</b> {turn.intent || "No reportada"}</span>
                         <span data-testid="turn-human-attention" data-value={turn.humanAttention === null ? "" : String(turn.humanAttention)}><b>Atención humana:</b> {turn.humanAttention === null ? "Sin dato" : turn.humanAttention ? "Sí (activada)" : "No"}</span>
                       </div>
-                      {turn.error && <p className="turn-error">{turn.error}</p>}
+                      {turn.error && (
+                        <p className="turn-error">
+                          {turn.error}
+                          {turn.errorSource && <span>Origen: {turn.errorSource}</span>}
+                          {turn.errorCode && <span>Código: {turn.errorCode}</span>}
+                        </p>
+                      )}
                       <details className="turn-details">
                         <summary>Ver intercambio y datos de sesión</summary>
                         <dl>
@@ -1306,6 +1651,18 @@ function App() {
                           <dd data-testid="turn-question">{turn.question}</dd>
                           <dt>Perfil / teléfono</dt>
                           <dd>{turn.profileName} · {turn.phone}</dd>
+                          <dt>Rama</dt>
+                          <dd data-testid="turn-branch">{turn.branch}</dd>
+                          <dt>Universo</dt>
+                          <dd data-testid="turn-universe">{turn.universe || "No aplica"}</dd>
+                          <dt>Número de caso</dt>
+                          <dd data-testid="turn-case-number">{turn.caseNumber || "No indicado"}</dd>
+                          <dt>Origen del error</dt>
+                          <dd>{turn.errorSource || "Ninguno"}</dd>
+                          <dt>Código del error</dt>
+                          <dd>{turn.errorCode || "Ninguno"}</dd>
+                          <dt>Detalle técnico</dt>
+                          <dd>{turn.errorDetail || "Ninguno"}</dd>
                           <dt>Respuesta</dt>
                           <dd data-testid="turn-response">
                             {turn.response || "No se recibió respuesta del endpoint."}
