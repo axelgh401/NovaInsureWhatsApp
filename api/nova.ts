@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 
 const BOT_ENDPOINT =
   "https://api-nova-5yuwh.ondigitalocean.app/api/superchat/webhook-flowise";
-const BOT_TIMEOUT_MS = 120_000;
+const BOT_TIMEOUT_MS = 285_000;
 
 function getRequestId(request: VercelRequest) {
   const requestId = request.headers["x-request-id"];
@@ -74,7 +74,7 @@ export default async function handler(
     const detail = error instanceof Error ? error.message : String(error);
     const code = timedOut ? "BOT_TIMEOUT" : "BOT_CONNECTION_FAILED";
     const message = timedOut
-      ? "El servicio del bot no respondió dentro de 2 minutos."
+      ? "El servicio del bot no respondió dentro de 4 minutos y 45 segundos."
       : "El servidor del simulador no pudo conectar con el servicio del bot.";
 
     console.error("[nova-proxy] Falló la solicitud al bot", {

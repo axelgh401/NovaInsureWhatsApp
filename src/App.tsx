@@ -225,9 +225,8 @@ function responseObject(value: unknown): ApiResponse | null {
   };
 }
 
-const BOT_REQUEST_TIMEOUT_MS = 120_000;
-const CLIENT_REQUEST_TIMEOUT_MS = 130_000;
-const CLIENT_REQUEST_TIMEOUT_LABEL = "2 min 10 s";
+const BOT_REQUEST_TIMEOUT_MS = 285_000;
+const CLIENT_REQUEST_TIMEOUT_MS = 310_000;
 
 function formatElapsed(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -1565,7 +1564,7 @@ function App() {
                 {isSending && (
                   <div className="typing" role="status" aria-live="polite" data-testid="request-progress">
                     <i /><i /><i />
-                    <span>Esperando respuesta del bot · {formatElapsed(elapsedSeconds)} / {CLIENT_REQUEST_TIMEOUT_LABEL}</span>
+                    <span>Esperando respuesta del bot · {formatElapsed(elapsedSeconds)} / {formatElapsed(CLIENT_REQUEST_TIMEOUT_MS / 1000)}</span>
                   </div>
                 )}
               </div>

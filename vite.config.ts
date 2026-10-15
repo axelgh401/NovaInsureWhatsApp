@@ -11,16 +11,16 @@ export default defineConfig(({ mode }) => {
         "/api/nova": {
           target: "https://api-nova-5yuwh.ondigitalocean.app",
           changeOrigin: true,
-          timeout: 130_000,
-          proxyTimeout: 125_000,
+          timeout: 300_000,
+          proxyTimeout: 295_000,
           headers: {
             "X-API-Key": env.NOVA_API_KEY || "",
           },
           configure: (proxy) => {
             proxy.on("proxyReq", (proxyRequest) => {
-              proxyRequest.setTimeout(120_000, () => {
+              proxyRequest.setTimeout(285_000, () => {
                 const timeoutError = Object.assign(
-                  new Error("El servicio del bot superó el límite de 2 minutos."),
+                  new Error("El servicio del bot superó el límite de 4 minutos y 45 segundos."),
                   { code: "ETIMEDOUT" },
                 );
                 proxyRequest.destroy(timeoutError);
@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
               const status = timedOut ? 504 : 502;
               const code = timedOut ? "BOT_TIMEOUT" : "BOT_CONNECTION_FAILED";
               const message = timedOut
-                ? "El servicio del bot no respondió dentro de 2 minutos."
+                ? "El servicio del bot no respondió dentro de 4 minutos y 45 segundos."
                 : "El servidor de desarrollo no pudo conectar con el servicio del bot.";
 
               console.error("[nova-dev-proxy] Falló la solicitud al bot", {
