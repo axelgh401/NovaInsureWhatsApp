@@ -1,6 +1,33 @@
 import { ChangeEvent, FormEvent, Fragment, ReactNode, useEffect, useRef, useState } from "react";
 import { toJpeg, toPng } from "html-to-image";
 
+type ApiTimingBreakdown = {
+  etapa: string | null;
+  duracion_ms: number | null;
+  intento_1_ms: number | null;
+  reintento_ms: number | null;
+  reintento_ejecutado: boolean | null;
+  descripcion: string | null;
+};
+
+type ApiTimingData = {
+  total_ms: number | null;
+  total_seconds: number | null;
+  entrega_ms: number | null;
+  flowise_ms: number | null;
+  devolucion_ms: number | null;
+  reintento_ejecutado: boolean | null;
+  breakdown: ApiTimingBreakdown[];
+};
+
+type ApiTiming = ApiTimingData & {
+  topLevel: ApiTimingData;
+  time: ApiTimingData | null;
+  time_ms: string | null;
+  time_flowise_ms: string | null;
+  time_summary: string | null;
+};
+
 type ApiResponse = {
   success?: boolean | string;
   message?: string;
@@ -15,6 +42,7 @@ type ApiResponse = {
   detail?: string;
   requestId?: string;
   upstreamStatus?: number;
+  timing?: ApiTiming | null;
 };
 
 type RequestFailure = {
@@ -41,6 +69,7 @@ type TrackedTurn = {
   startedAt: string;
   completedAt: string | null;
   latencyMs: number | null;
+  apiTiming: ApiTiming | null;
   httpStatus: number | null;
   apiSuccess: boolean | null;
   humanAttention: boolean | null;
@@ -63,6 +92,99 @@ function responseFlag(value: ApiResponse["success"]): boolean | null {
 function responseValue(value: string | number | undefined): string | null {
   if (value === undefined || value === null) return null;
   return String(value);
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function numberValue(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function booleanValue(value: unknown): boolean | null {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return null;
+}
+
+function stringValue(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function apiTimingData(record: Record<string, unknown>): ApiTimingData {
+  const breakdown = Array.isArray(record.breakdown)
+    ? record.breakdown.flatMap((item): ApiTimingBreakdown[] => {
+        const entry = objectValue(item);
+        if (!entry) return [];
+        return [{
+          etapa: stringValue(entry.etapa),
+          duracion_ms: numberValue(entry.duracion_ms),
+          intento_1_ms: numberValue(entry.intento_1_ms),
+          reintento_ms: numberValue(entry.reintento_ms),
+          reintento_ejecutado: booleanValue(entry.reintento_ejecutado),
+          descripcion: stringValue(entry.descripcion),
+        }];
+      })
+    : [];
+  return {
+    total_ms: numberValue(record.total_ms),
+    total_seconds: numberValue(record.total_seconds),
+    entrega_ms: numberValue(record.entrega_ms),
+    flowise_ms: numberValue(record.flowise_ms),
+    devolucion_ms: numberValue(record.devolucion_ms),
+    reintento_ejecutado: booleanValue(record.reintento_ejecutado),
+    breakdown,
+  };
+}
+
+function hasApiTimingData(timing: ApiTimingData) {
+  return (
+    timing.total_ms !== null ||
+    timing.total_seconds !== null ||
+    timing.entrega_ms !== null ||
+    timing.flowise_ms !== null ||
+    timing.devolucion_ms !== null ||
+    timing.reintento_ejecutado !== null ||
+    timing.breakdown.length > 0
+  );
+}
+
+function apiTimingValue(record: Record<string, unknown>): ApiTiming | null {
+  const topLevel = apiTimingData(record);
+  const timeRecord = objectValue(record.time);
+  const time = timeRecord ? apiTimingData(timeRecord) : null;
+  const breakdown = time?.breakdown.length ? time.breakdown : topLevel.breakdown;
+  const timing: ApiTiming = {
+    total_ms: time?.total_ms ?? topLevel.total_ms,
+    total_seconds: time?.total_seconds ?? topLevel.total_seconds,
+    entrega_ms: time?.entrega_ms ?? topLevel.entrega_ms,
+    flowise_ms: time?.flowise_ms ?? topLevel.flowise_ms,
+    devolucion_ms: time?.devolucion_ms ?? topLevel.devolucion_ms,
+    reintento_ejecutado: time?.reintento_ejecutado ?? topLevel.reintento_ejecutado,
+    breakdown,
+    topLevel,
+    time,
+    time_ms: stringValue(record.time_ms ?? timeRecord?.time_ms),
+    time_flowise_ms: stringValue(record.time_flowise_ms ?? timeRecord?.time_flowise_ms),
+    time_summary: stringValue(record.time_summary ?? timeRecord?.time_summary),
+  };
+  const hasTimingData =
+    hasApiTimingData(topLevel) ||
+    (time !== null && hasApiTimingData(time)) ||
+    timing.time_ms !== null ||
+    timing.time_flowise_ms !== null ||
+    timing.time_summary !== null;
+  return hasTimingData ? timing : null;
 }
 
 function responseObject(value: unknown): ApiResponse | null {
@@ -99,6 +221,7 @@ function responseObject(value: unknown): ApiResponse | null {
     detail: textField(record.detail),
     requestId: typeof record.requestId === "string" ? record.requestId : undefined,
     upstreamStatus: typeof record.upstreamStatus === "number" ? record.upstreamStatus : undefined,
+    timing: apiTimingValue(record),
   };
 }
 
@@ -112,6 +235,28 @@ function formatElapsed(seconds: number) {
   return minutes > 0
     ? `${minutes} min ${String(remainingSeconds).padStart(2, "0")} s`
     : `${remainingSeconds} s`;
+}
+
+function formatReportedDuration(milliseconds: number | null | undefined) {
+  return milliseconds === null || milliseconds === undefined
+    ? "No reportado"
+    : `${milliseconds.toLocaleString("es-MX")} ms`;
+}
+
+function apiRetryInfo(timing: ApiTiming | null) {
+  const stageRetries =
+    timing?.breakdown.flatMap((stage, index) =>
+      stage.reintento_ejecutado === null
+        ? []
+        : [{ index, stage: stage.etapa ?? "etapa", executed: stage.reintento_ejecutado }],
+    ) ?? [];
+  const primary = timing?.reintento_ejecutado !== null && timing?.reintento_ejecutado !== undefined
+    ? { label: "Reintento general", executed: timing.reintento_ejecutado }
+    : stageRetries[0]
+      ? { label: `Reintento · ${stageRetries[0].stage}`, executed: stageRetries[0].executed }
+      : null;
+  const additionalStages = timing?.reintento_ejecutado !== null ? stageRetries : stageRetries.slice(1);
+  return { primary, additionalStages };
 }
 
 function describeHttpFailure(
@@ -581,6 +726,7 @@ function App() {
         startedAt,
         completedAt: null,
         latencyMs: null,
+        apiTiming: null,
         httpStatus: null,
         apiSuccess: null,
         humanAttention: null,
@@ -651,6 +797,7 @@ function App() {
                 response: botText || (typeof payload === "string" ? payload : JSON.stringify(payload)),
                 completedAt: new Date().toISOString(),
                 latencyMs,
+                apiTiming: responseData?.timing ?? null,
                 httpStatus: response.status,
                 apiSuccess,
                 humanAttention: responseFlag(responseData?.human_attention),
@@ -718,6 +865,7 @@ function App() {
                 response: "",
                 completedAt: new Date().toISOString(),
                 latencyMs,
+                apiTiming: null,
                 error: failure.message,
                 errorSource: failure.source,
                 errorCode: failure.code,
@@ -1002,6 +1150,17 @@ function App() {
           `HTTP: ${turn.httpStatus ?? "Sin respuesta"}`,
           `Resultado API: ${turn.apiSuccess === null ? "Sin dato" : turn.apiSuccess ? "Correcto" : "Error"}`,
           `Latencia: ${turn.latencyMs === null ? "En curso" : `${turn.latencyMs.toFixed(2)} ms`}`,
+          `Tiempo total reportado por API: ${formatReportedDuration(turn.apiTiming?.total_ms)}`,
+          `Tiempo total en segundos: ${turn.apiTiming?.total_seconds === null || turn.apiTiming?.total_seconds === undefined ? "No reportado" : `${turn.apiTiming.total_seconds} s`}`,
+          `Entrega y recepción: ${formatReportedDuration(turn.apiTiming?.entrega_ms)}`,
+          `Procesamiento Flowise: ${formatReportedDuration(turn.apiTiming?.flowise_ms)}`,
+          `Devolución y persistencia: ${formatReportedDuration(turn.apiTiming?.devolucion_ms)}`,
+          `Reintento ejecutado: ${turn.apiTiming?.reintento_ejecutado === null || turn.apiTiming?.reintento_ejecutado === undefined ? "No reportado" : turn.apiTiming.reintento_ejecutado ? "Sí" : "No"}`,
+          `Timers de nivel raíz: ${turn.apiTiming && hasApiTimingData(turn.apiTiming.topLevel) ? JSON.stringify(turn.apiTiming.topLevel) : "No reportados"}`,
+          `Resumen de tiempos API: ${turn.apiTiming?.time_summary ?? "No reportado"}`,
+          ...(turn.apiTiming?.breakdown.map((stage) =>
+            `Etapa ${stage.etapa ?? "sin nombre"}: ${formatReportedDuration(stage.duracion_ms)}${stage.descripcion ? ` · ${stage.descripcion}` : ""}`,
+          ) ?? []),
           `Agente: ${turn.agent ?? "No reportado"}`,
           `Intención: ${turn.intent ?? "No reportada"}`,
           `Fase: ${turn.phase ?? "No reportada"}`,
@@ -1099,7 +1258,7 @@ function App() {
     ...turn,
   }));
   const trackingSnapshot = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     profile: {
       id: selectedProfile,
       name: selectedProfileName,
@@ -1514,7 +1673,7 @@ function App() {
             ref={metricsExportRef}
             aria-label="Métricas y seguimiento de la conversación"
             data-testid="conversation-metrics"
-            data-schema-version="1"
+            data-schema-version="2"
             data-total-turns={turns.length}
             data-completed-turns={completedTurns.length}
             data-failed-turns={failedTurns}
@@ -1600,6 +1759,7 @@ function App() {
               <div className="turn-list">
                 {turns.map((turn, index) => {
                   const turnFailed = turn.error !== null;
+                  const retryInfo = apiRetryInfo(turn.apiTiming);
                   return (
                     <article
                       className={`turn-card${turnFailed ? " turn-card-error" : ""}`}
@@ -1617,6 +1777,11 @@ function App() {
                       data-human-attention={turn.humanAttention === null ? "" : String(turn.humanAttention)}
                       data-session-id={turn.sessionId ?? ""}
                       data-latency-ms={turn.latencyMs ?? ""}
+                      data-api-total-ms={turn.apiTiming?.total_ms ?? ""}
+                      data-api-flowise-ms={turn.apiTiming?.flowise_ms ?? ""}
+                      data-api-delivery-ms={turn.apiTiming?.entrega_ms ?? ""}
+                      data-api-return-ms={turn.apiTiming?.devolucion_ms ?? ""}
+                      data-api-retry={turn.apiTiming?.reintento_ejecutado === null || turn.apiTiming?.reintento_ejecutado === undefined ? "" : String(turn.apiTiming.reintento_ejecutado)}
                       data-profile-id={turn.profileId}
                       data-branch={turn.branch}
                       data-universe={turn.universe ?? ""}
@@ -1640,6 +1805,18 @@ function App() {
                         <span data-testid="turn-phase" data-value={turn.phase ?? ""}><b>Fase:</b> {turn.phase || "No reportada"}</span>
                         <span className="turn-intent" data-testid="turn-intent" data-value={turn.intent ?? ""}><b>Intención:</b> {turn.intent || "No reportada"}</span>
                         <span data-testid="turn-human-attention" data-value={turn.humanAttention === null ? "" : String(turn.humanAttention)}><b>Atención humana:</b> {turn.humanAttention === null ? "Sin dato" : turn.humanAttention ? "Sí (activada)" : "No"}</span>
+                        <span data-testid="turn-api-total-ms" data-value-ms={turn.apiTiming?.total_ms ?? ""}><b>Total API:</b> {formatReportedDuration(turn.apiTiming?.total_ms)}</span>
+                        <span data-testid="turn-api-flowise-ms" data-value-ms={turn.apiTiming?.flowise_ms ?? ""}><b>Flowise:</b> {formatReportedDuration(turn.apiTiming?.flowise_ms)}</span>
+                        <span data-testid="turn-api-retry" data-value={retryInfo.primary ? String(retryInfo.primary.executed) : ""}><b>{retryInfo.primary?.label ?? "Reintento"}:</b> {retryInfo.primary ? retryInfo.primary.executed ? "Sí" : "No" : "No reportado"}</span>
+                        {retryInfo.additionalStages.map((retry) => (
+                          <span
+                            key={`${retry.index}-${retry.stage}`}
+                            data-testid="turn-api-retry-stage"
+                            data-value={String(retry.executed)}
+                          >
+                            <b>Reintento · {retry.stage}:</b> {retry.executed ? "Sí" : "No"}
+                          </span>
+                        ))}
                       </div>
                       {turn.error && (
                         <p className="turn-error">
@@ -1661,6 +1838,68 @@ function App() {
                           <dd data-testid="turn-universe">{turn.universe || "No aplica"}</dd>
                           <dt>Número de caso</dt>
                           <dd data-testid="turn-case-number">{turn.caseNumber || "No indicado"}</dd>
+                          <dt>Tiempo total API</dt>
+                          <dd data-testid="turn-api-total-seconds">
+                            {turn.apiTiming?.total_seconds === null || turn.apiTiming?.total_seconds === undefined
+                              ? "No reportado"
+                              : `${turn.apiTiming.total_seconds} s (${formatReportedDuration(turn.apiTiming.total_ms)})`}
+                          </dd>
+                          <dt>Entrega y recepción</dt>
+                          <dd data-testid="turn-api-delivery-ms">
+                            {formatReportedDuration(turn.apiTiming?.entrega_ms)}
+                          </dd>
+                          <dt>Procesamiento Flowise</dt>
+                          <dd data-testid="turn-api-flowise-detail">
+                            {formatReportedDuration(turn.apiTiming?.flowise_ms)}
+                          </dd>
+                          <dt>Devolución y persistencia</dt>
+                          <dd data-testid="turn-api-return-ms">
+                            {formatReportedDuration(turn.apiTiming?.devolucion_ms)}
+                          </dd>
+                          <dt>Tiempo total (campo API)</dt>
+                          <dd data-testid="turn-api-time-ms">
+                            {turn.apiTiming?.time_ms ?? "No reportado"}
+                          </dd>
+                          <dt>Tiempo total en `time`</dt>
+                          <dd data-testid="turn-api-nested-total-ms">
+                            {turn.apiTiming?.time?.total_ms === null || turn.apiTiming?.time?.total_ms === undefined
+                              ? "No reportado"
+                              : formatReportedDuration(turn.apiTiming.time.total_ms)}
+                          </dd>
+                          <dt>Tiempo Flowise (campo API)</dt>
+                          <dd data-testid="turn-api-time-flowise-ms">
+                            {turn.apiTiming?.time_flowise_ms ?? "No reportado"}
+                          </dd>
+                          <dt>Timers de nivel raíz</dt>
+                          <dd data-testid="turn-api-root-timers">
+                            {turn.apiTiming && hasApiTimingData(turn.apiTiming.topLevel)
+                              ? JSON.stringify(turn.apiTiming.topLevel)
+                              : "No reportados"}
+                          </dd>
+                          <dt>Reintento ejecutado</dt>
+                          <dd data-testid="turn-api-retry-detail">
+                            {turn.apiTiming?.reintento_ejecutado === null || turn.apiTiming?.reintento_ejecutado === undefined
+                              ? "No reportado"
+                              : turn.apiTiming.reintento_ejecutado ? "Sí" : "No"}
+                          </dd>
+                          <dt>Resumen de tiempos</dt>
+                          <dd data-testid="turn-api-time-summary">
+                            {turn.apiTiming?.time_summary ?? "No reportado"}
+                          </dd>
+                          <dt>Desglose de etapas</dt>
+                          <dd data-testid="turn-api-time-breakdown">
+                            {turn.apiTiming?.breakdown.length
+                              ? turn.apiTiming.breakdown.map((stage, stageIndex) => (
+                                  <div key={`${stage.etapa ?? "stage"}-${stageIndex}`}>
+                                    <b>{stage.etapa ?? "Etapa"}</b>: {formatReportedDuration(stage.duracion_ms)}
+                                    {stage.intento_1_ms !== null && ` · Intento 1: ${formatReportedDuration(stage.intento_1_ms)}`}
+                                    {stage.reintento_ms !== null && ` · Reintento: ${formatReportedDuration(stage.reintento_ms)}`}
+                                    {stage.reintento_ejecutado !== null && ` · Reintento ejecutado: ${stage.reintento_ejecutado ? "Sí" : "No"}`}
+                                    {stage.descripcion && ` · ${stage.descripcion}`}
+                                  </div>
+                                ))
+                              : "No reportado"}
+                          </dd>
                           <dt>Origen del error</dt>
                           <dd>{turn.errorSource || "Ninguno"}</dd>
                           <dt>Código del error</dt>
